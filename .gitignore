@@ -1,0 +1,26 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database
+raven.db
+raven.db-journal
+
+# Reports and Logs
+reports/
+logs/
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
