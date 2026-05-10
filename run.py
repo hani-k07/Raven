@@ -13,17 +13,16 @@ import app
 
 init(autoreset=True)
 
-ASCII_ART = f"""{Fore.RED}
+ASCII_ART = Fore.RED + r"""
   _____            __      __  ______   _   _   ___     ___  
  |  __ \           \ \    / / |  ____| | \ | | |__ \   / _ \ 
  | |__) |   __ _    \ \  / /  | |__    |  \| |    ) | | | | |
  |  _  /   / _` |    \ \/ /   |  __|   | . ` |   / /  | | | |
  | | \ \  | (_| |     \  /    | |____  | |\  |  / /_  | |_| |
  |_|  \_\  \__,_|      \/     |______| |_| \_| |____|  \___/ 
-                                                             
+                                                              
     Cybersecurity Monitoring & Autonomous Defense System
-{Fore.RESET}
-"""
+""" + Fore.RESET
 
 def log_polling_daemon():
     """Polls logs every 60 seconds."""
