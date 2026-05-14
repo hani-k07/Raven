@@ -2,5 +2,5 @@ customtkinter
 python-dotenv
 requests
 reportlab
-schedule
 colorama
+matplotlib

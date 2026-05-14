@@ -1,15 +1,15 @@
 import sqlite3
 from pathlib import Path
 
+DB_PATH = Path(__file__).parent / "raven.db"
+
 def init_db():
-    """Initializes the SQLite database with required tables."""
-    db_path = Path(__file__).parent / "raven.db"
-    conn = sqlite3.connect(db_path)
+    """Initializes the SQLite database with required tables. Safe to call on every startup — does NOT drop existing data."""
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    cursor.execute("DROP TABLE IF EXISTS threats;")
     cursor.execute("""
-        CREATE TABLE threats (
+        CREATE TABLE IF NOT EXISTS threats (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
             source_ip TEXT,
@@ -21,11 +21,9 @@ def init_db():
             alerted BOOLEAN
         );
     """)
-    print("Table 'threats' created successfully.")
 
-    cursor.execute("DROP TABLE IF EXISTS audit_results;")
     cursor.execute("""
-        CREATE TABLE audit_results (
+        CREATE TABLE IF NOT EXISTS audit_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             check_name TEXT,
             status TEXT,
@@ -33,11 +31,9 @@ def init_db():
             timestamp TEXT
         );
     """)
-    print("Table 'audit_results' created successfully.")
 
-    cursor.execute("DROP TABLE IF EXISTS honeypot_events;")
     cursor.execute("""
-        CREATE TABLE honeypot_events (
+        CREATE TABLE IF NOT EXISTS honeypot_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
             attacker_ip TEXT,
@@ -45,11 +41,23 @@ def init_db():
             payload TEXT
         );
     """)
-    print("Table 'honeypot_events' created successfully.")
 
     conn.commit()
     conn.close()
-    print(f"Database initialized successfully at {db_path}")
+    print(f"Database ready at {DB_PATH}")
+
+def reset_db():
+    """Drops and recreates all tables. FOR TESTING ONLY — destroys all data."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS threats;")
+    cursor.execute("DROP TABLE IF EXISTS audit_results;")
+    cursor.execute("DROP TABLE IF EXISTS honeypot_events;")
+    conn.commit()
+    conn.close()
+    print("All tables dropped.")
+    init_db()
+    print("Database reset complete.")
 
 if __name__ == "__main__":
     init_db()

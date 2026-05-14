@@ -72,16 +72,10 @@ def start_honeypot_listener(port: int) -> None:
         server_socket.close()
 
 def start_honeypot(ports: list[int]) -> None:
-    """Starts honeypot listeners for all specified ports."""
-    threads = []
+    """Starts honeypot listeners for all specified ports as daemon threads."""
     for port in ports:
         thread = threading.Thread(target=start_honeypot_listener, args=(port,), daemon=True)
         thread.start()
-        threads.append(thread)
-        
-    if __name__ == "__main__":
-        for thread in threads:
-            thread.join()
 
 if __name__ == "__main__":
     print("Testing standalone honeypot.py on port 9999...")

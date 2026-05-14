@@ -6,6 +6,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.units import inch
+import mitre_mapper
 
 DB_PATH = Path(__file__).parent / "raven.db"
 
@@ -160,12 +161,16 @@ def generate_report(output_dir: Path) -> Path:
                 analysis = analysis[:77] + "..."
                 
             time_short = t.get('timestamp', '')[:19].replace("T", " ")
+            event_type = t.get('event_type', '')
+            mitre = mitre_mapper.get_mitre(event_type)
+            if mitre["tactic_id"] != "Unknown":
+                event_type = f"{event_type}\n({mitre['technique_id']})"
             
             threat_table_data.append([
                 time_short,
                 t.get('severity', 'Unknown'),
                 t.get('source_ip', ''),
-                t.get('event_type', ''),
+                event_type,
                 Paragraph(analysis, styles['Normal'])
             ])
             

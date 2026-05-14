@@ -13,6 +13,7 @@ LOG_FILE_LINUX = os.getenv("LOG_FILE_LINUX")
 LOG_FILE_WINDOWS = os.getenv("LOG_FILE_WINDOWS")
 AI_MODEL = os.getenv("AI_MODEL", "nvidia/nemotron-3-8b-chat")
 OPENROUTER_URL = os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions")
+ABUSEIPDB_API_KEY = os.getenv("ABUSEIPDB_API_KEY")
 
 HONEYPOT_PORTS = [int(p.strip()) for p in HONEYPOT_PORTS_STR.split(",")] if HONEYPOT_PORTS_STR else []
 
