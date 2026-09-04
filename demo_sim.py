@@ -1,17 +1,4 @@
-"""
-RAVEN 2.0 - Advanced Attack Simulator
-Run this in a SEPARATE terminal while RAVEN dashboard is running.
-Injects realistic attack chains into the database for live visualization.
 
-Usage:
-  python demo_sim.py                 # Full simulation (all waves)
-  python demo_sim.py --wave 1        # Recon only
-  python demo_sim.py --wave 2        # Brute force wave
-  python demo_sim.py --wave 3        # Compliance failures
-  python demo_sim.py --wave apt      # Full APT kill chain
-  python demo_sim.py --wave stress   # 50 random events across 24h
-  python demo_sim.py --wave honeypot # Honeypot-only events
-"""
 import time
 import sqlite3
 import random
