@@ -47,6 +47,24 @@ MITRE_MAP = {
         "technique_id": "T1595",
         "technique_name": "Active Scanning",
     },
+    "FILE_INTEGRITY_CHANGE": {
+        "tactic_id": "TA0003",
+        "tactic_name": "Persistence",
+        "technique_id": "T1565",
+        "technique_name": "Data Manipulation",
+    },
+    "UNEXPECTED_LISTENING_PORT": {
+        "tactic_id": "TA0003",
+        "tactic_name": "Persistence",
+        "technique_id": "T1543",
+        "technique_name": "Create or Modify System Process",
+    },
+    "SUSPICIOUS_OUTBOUND_CONNECTION": {
+        "tactic_id": "TA0010",
+        "tactic_name": "Exfiltration",
+        "technique_id": "T1041",
+        "technique_name": "Exfiltration Over C2 Channel",
+    },
 }
 
 def get_mitre(event_type: str) -> dict:

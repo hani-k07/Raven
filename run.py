@@ -34,6 +34,17 @@ def log_polling_daemon():
             print(f"{Fore.RED}[DAEMON] Log parser error: {e}")
         time.sleep(60)
 
+def process_monitor_daemon():
+    """Checks for process and network anomalies every 60 seconds."""
+    import process_monitor
+    while True:
+        try:
+            print(f"{Fore.CYAN}[DAEMON] Checking system anomalies...")
+            process_monitor.monitor_system()
+        except Exception as e:
+            print(f"{Fore.RED}[DAEMON] Process monitor error: {e}")
+        time.sleep(60)
+
 def main():
     print(ASCII_ART)
     print(f"{Fore.YELLOW}Initializing RAVEN 2.0...\n")
@@ -79,6 +90,10 @@ def main():
     log_thread = threading.Thread(target=log_polling_daemon, daemon=True)
     log_thread.start()
     
+    print(f"{Fore.GREEN}[5.1/6] Starting System Anomaly Watchdog...")
+    proc_thread = threading.Thread(target=process_monitor_daemon, daemon=True)
+    proc_thread.start()
+
     print(f"{Fore.GREEN}[6/6] Starting CustomTkinter Dashboard and Alert System...")
     app.run_app()
 
