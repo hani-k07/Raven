@@ -1,4 +1,5 @@
 ## [Unreleased]
+- feat(analysis): add VirusTotal file-hash and Shodan IP enrichment
 - feat(reporting): add scheduled daily/weekly automatic PDF report generation and delivery
 - feat(detection): add process and outbound connection anomaly monitoring via psutil
 - feat(analysis): add false-positive marking and IP allowlist feedback loop
