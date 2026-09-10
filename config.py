@@ -45,3 +45,6 @@ REPORT_DELIVERY = os.getenv("REPORT_DELIVERY", "file") # "file", "telegram", "em
 # Enrichment APIs
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
 SHODAN_API_KEY = os.getenv("SHODAN_API_KEY")
+
+# Log Sources
+WEB_LOG_PATH = os.getenv("WEB_LOG_PATH")

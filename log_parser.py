@@ -3,9 +3,10 @@ import re
 import sqlite3
 from pathlib import Path
 from colorama import init, Fore
-from config import LOG_FILE_LINUX, LOG_FILE_WINDOWS
+from config import LOG_FILE_LINUX, LOG_FILE_WINDOWS, WEB_LOG_PATH
 from analyzer import analyze_threat
 from datetime import datetime
+import honeypot
 
 init(autoreset=True)
 
@@ -129,7 +130,24 @@ def _parse_windows_logs() -> list[dict]:
                     source_ip = data[19] if data and len(data) > 19 else "Unknown"
                     raw_log = f"Failed logon. Target: {data[5] if data and len(data) > 5 else 'Unknown'}"
                     event_type = "Failed Logon"
-                    
+                elif event.EventID == 4648:
+                    data = event.StringInserts
+                    source_ip = data[1] if data and len(data) > 1 else "Unknown"
+                    raw_log = f"Explicit credentials used. Target: {data[2] if data and len(data) > 2 else 'Unknown'}"
+                    event_type = "WIN_4648"
+                elif event.EventID == 4672:
+                    data = event.StringInserts
+                    source_ip = "local"
+                    raw_log = f"Special privileges assigned to: {data[1] if data and len(data) > 1 else 'Unknown'}"
+                    event_type = "WIN_4672"
+                elif event.EventID == 4720:
+                    data = event.StringInserts
+                    source_ip = "local"
+                    raw_log = f"New user account created: {data[0] if data and len(data) > 0 else 'Unknown'}"
+                    event_type = "WIN_4720"
+                else:
+                    continue
+
                     analysis = analyze_threat(event_type, raw_log, source_ip)
                     timestamp = event.TimeGenerated.Format() if event.TimeGenerated else datetime.now().isoformat()
                     
@@ -152,18 +170,70 @@ def _parse_windows_logs() -> list[dict]:
         
     return threats_found
 
+def _parse_web_server_logs(log_path: str) -> list[dict]:
+    """Parses Nginx/Apache combined log format."""
+    path = Path(log_path)
+    if not path.exists():
+        return []
+
+    # Combined Log Format: %h %l %u %t "%r" %>s %b "%{Referer}i" "%{User-Agent}i"
+    # Example: 127.0.0.1 - - [10/Sep/2026:10:00:00 +0000] "GET /admin HTTP/1.1" 404 123 "-" "Mozilla/5.0"
+    pattern = r'^(\S+) \S+ \S+ \[(.*?)\] "(.*?) (.*?) .*?" (\d{3}) \d+ ".*?" "(.*?)"'
+
+    threats_found = []
+    processed = 0
+
+    try:
+        with open(path, 'r') as f:
+            lines = f.readlines()
+            for line in lines[-1000:]:
+                if processed >= 50:
+                    break
+
+                match = re.search(pattern, line)
+                if match:
+                    ip, ts, method, path_req, status, ua = match.groups()
+                    status_int = int(status)
+
+                    is_suspicious = False
+                    if any(p in path_req.lower() for p in honeypot.SENSITIVE_PATHS):
+                        is_suspicious = True
+                    elif status_int >= 400:
+                        # For simplicity, flag as suspicious if 4xx/5xx
+                        is_suspicious = True
+
+                    if is_suspicious:
+                        event_type = "SUSPICIOUS_WEB_REQUEST"
+                        raw_log = f"Web request: {method} {path_req} returned {status} from {ip} (UA: {ua})"
+                        analysis = analyze_threat(event_type, raw_log, ip)
+                        _insert_threat(datetime.now().isoformat(), ip, event_type, raw_log, analysis)
+                        threats_found.append({
+                            "event_type": event_type,
+                            "source_ip": ip,
+                            "raw_log": raw_log,
+                            "analysis": analysis
+                        })
+                        processed += 1
+    except Exception as e:
+        print(f"Error reading web logs: {e}")
+
+    return threats_found
+
 def parse_logs() -> list[dict]:
     """Parses OS-specific logs and analyzes threats."""
     os_name = platform.system()
     results = []
-    
+
     if os_name == "Linux":
-        results = _parse_linux_logs()
+        results.extend(_parse_linux_logs())
     elif os_name == "Windows":
-        results = _parse_windows_logs()
+        results.extend(_parse_windows_logs())
     else:
         print(f"Unsupported OS for log parsing: {os_name}")
-        
+
+    if WEB_LOG_PATH:
+        results.extend(_parse_web_server_logs(WEB_LOG_PATH))
+
     return results
 
 if __name__ == "__main__":
