@@ -1,4 +1,5 @@
 ## [Unreleased]
+- feat(detection): expand Windows event coverage and add web server log parsing
 - feat(analysis): add VirusTotal file-hash and Shodan IP enrichment
 - feat(reporting): add scheduled daily/weekly automatic PDF report generation and delivery
 - feat(detection): add process and outbound connection anomaly monitoring via psutil
