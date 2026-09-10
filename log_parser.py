@@ -11,10 +11,25 @@ init(autoreset=True)
 
 DB_PATH = Path(__file__).parent / "raven.db"
 
+def _is_ip_allowlisted(ip: str) -> bool:
+    """Checks if an IP is in the allowlist."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM ip_allowlist WHERE ip = ?", (ip,))
+    exists = cursor.fetchone() is not None
+    conn.close()
+    return exists
+
 def _insert_threat(timestamp: str, source_ip: str, event_type: str, raw_log: str, ai_analysis: dict) -> None:
     """Inserts a threat record into the database and prints to console."""
     severity = ai_analysis.get('severity', 'Medium')
-    
+    explanation = ai_analysis.get('explanation', '')
+    recommendation = ai_analysis.get('recommendation', '')
+
+    if _is_ip_allowlisted(source_ip):
+        severity = "Low"
+        explanation = f"[ALLOWLISTED] {explanation}"
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
@@ -26,8 +41,8 @@ def _insert_threat(timestamp: str, source_ip: str, event_type: str, raw_log: str
         event_type,
         raw_log,
         severity,
-        ai_analysis.get('explanation', ''),
-        ai_analysis.get('recommendation', ''),
+        explanation,
+        recommendation,
         False
     ))
     conn.commit()

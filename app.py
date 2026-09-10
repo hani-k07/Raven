@@ -375,16 +375,29 @@ class RavenApp(ctk.CTk):
 
         body = ctk.CTkFrame(self.content, fg_color=BG_DARK)
         body.grid(row=1, column=0, sticky="nsew", padx=20, pady=0)
-        body.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        body.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
         body.grid_rowconfigure(1, weight=1)
 
         total, alerts, score, sev, fails = self._fetch_stats()
+
+        # False Positive Rate (Last 30 Days)
+        conn = self._db()
+        cursor = conn.cursor()
+        thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+        cursor.execute("SELECT COUNT(*) as n FROM threats WHERE timestamp >= ?", (thirty_days_ago,))
+        t_30 = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) as n FROM threats WHERE timestamp >= ? AND false_positive=1", (thirty_days_ago,))
+        fp_30 = cursor.fetchone()[0]
+        conn.close()
+
+        fp_rate = (fp_30 / t_30 * 100) if t_30 > 0 else 0.0
 
         # Stat cards
         self._stat_score = self._make_stat_card(body, "SECURITY SCORE", str(score), self._score_color(score), "/ 100", 0, 0, "score")
         self._stat_threats = self._make_stat_card(body, "TOTAL THREATS", str(total), MEDIUM_CLR, "detected", 0, 1, "total")
         self._stat_alerts = self._make_stat_card(body, "ACTIVE ALERTS", str(alerts), CRITICAL if alerts > 0 else TEXT_MUTED, "unresolved", 0, 2, "alerts")
         self._stat_audits = self._make_stat_card(body, "AUDIT FAILURES", str(fails), HIGH_CLR if fails > 0 else TEXT_MUTED, "issues", 0, 3, "fails")
+        self._stat_fp_rate = self._make_stat_card(body, "FP RATE (30D)", f"{fp_rate:.1f}%", LOW_CLR, "false positives", 0, 4, "fp_rate")
 
         # Recent threats preview
         preview_frame = ctk.CTkFrame(body, fg_color=BG_CARD, corner_radius=10, border_width=1, border_color=BORDER_CLR)
@@ -553,6 +566,16 @@ class RavenApp(ctk.CTk):
         ctk.CTkLabel(hdr, text=f"  {sev.upper()}  ", font=ctk.CTkFont(size=11, weight="bold"), fg_color=sev_clr, text_color="#000", corner_radius=4).pack(side="left")
         ctk.CTkLabel(hdr, text=t["event_type"], font=ctk.CTkFont(size=15, weight="bold"), text_color=TEXT_PRIMARY).pack(side="left", padx=12)
         ctk.CTkLabel(hdr, text=t["timestamp"], font=ctk.CTkFont(size=11), text_color=TEXT_MUTED).pack(side="right")
+
+        # False Positive Action
+        if not t.get("false_positive"):
+            fp_btn = ctk.CTkButton(
+                hdr, text="Mark False Positive", font=ctk.CTkFont(size=10),
+                width=120, height=20, fg_color="transparent",
+                text_color=TEXT_SECONDARY, hover_color=BG_ELEVATED,
+                command=lambda tid=t['id'], ip=t['source_ip']: self._mark_false_positive(tid, ip)
+            )
+            fp_btn.pack(side="right", padx=(10, 0))
 
         # Source IP
         ctk.CTkLabel(card, text=f"Source IP: {t['source_ip']}", font=ctk.CTkFont(size=13), text_color=TEXT_SECONDARY).pack(anchor="w", padx=16, pady=(0, 1))
@@ -912,6 +935,63 @@ class RavenApp(ctk.CTk):
 
         except Exception as e:
             print(f"Save settings error: {e}")
+
+    def _mark_false_positive(self, threat_id, ip):
+        """Marks a threat as false positive and optionally adds IP to allowlist."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Confirm False Positive")
+        dialog.geometry("350x180")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        x = self.winfo_rootx() + (self.winfo_width() // 2) - 175
+        y = self.winfo_rooty() + (self.winfo_height() // 2) - 90
+        dialog.geometry(f"+{x}+{y}")
+
+        ctk.CTkLabel(
+            dialog,
+            text=f"Mark threat {threat_id} as false positive?\n\nAlso add {ip} to the global allowlist?",
+            font=ctk.CTkFont(size=13),
+            text_color=TEXT_PRIMARY,
+            wraplength=300,
+            justify="center"
+        ).pack(pady=(30, 20), padx=20)
+
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=20)
+
+        def on_confirm(allowlist=False):
+            dialog.destroy()
+            conn = self._db()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE threats SET false_positive=1 WHERE id=?", (threat_id,))
+            if allowlist:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO ip_allowlist (ip, reason, added_at) VALUES (?, ?, ?)",
+                    (ip, "Marked as false positive from dashboard", datetime.now().isoformat())
+                )
+            conn.commit()
+            conn.close()
+            self.after(100, self._refresh_current_tab)
+
+        ctk.CTkButton(
+            btn_frame, text="No, just mark FP", width=120, height=32,
+            fg_color="transparent", border_width=1, border_color=TEXT_MUTED, text_color=TEXT_MUTED,
+            command=lambda: on_confirm(allowlist=False)
+        ).pack(side="left", padx=10, expand=True)
+
+        ctk.CTkButton(
+            btn_frame, text="Yes, add to allowlist", width=150, height=32,
+            fg_color=ACCENT, text_color="#000",
+            command=lambda: on_confirm(allowlist=True)
+        ).pack(side="right", padx=10, expand=True)
+
+        ctk.CTkButton(
+            dialog, text="Cancel", width=80, height=24,
+            fg_color="transparent", text_color=TEXT_MUTED,
+            command=dialog.destroy
+        ).pack(pady=(0, 10))
 
     def _run_scan(self):
         def worker():
