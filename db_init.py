@@ -22,6 +22,12 @@ def init_db():
         );
     """)
 
+    # Add indexes for performance
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_threats_timestamp ON threats(timestamp);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_threats_severity ON threats(severity);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_threats_alerted ON threats(alerted);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_threats_ip ON threats(source_ip);")
+
     # Add false_positive column if missing
     try:
         cursor.execute("ALTER TABLE threats ADD COLUMN false_positive BOOLEAN DEFAULT 0")
