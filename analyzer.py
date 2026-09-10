@@ -1,7 +1,10 @@
 import json
 import re
 import requests
-from config import OPENROUTER_API_KEY, AI_MODEL, OPENROUTER_URL, ABUSEIPDB_API_KEY
+from config import (
+    OPENROUTER_API_KEY, AI_MODEL, OPENROUTER_URL,
+    ABUSEIPDB_API_KEY, OLLAMA_URL, OLLAMA_MODEL
+)
 
 _VALID_SEVERITIES = {"Low", "Medium", "High", "Critical"}
 
@@ -34,8 +37,8 @@ def _extract_json(text: str) -> dict | None:
     return None
 
 
-def analyze_threat(event_type: str, raw_log: str, source_ip: str) -> dict:
-    """Analyzes a security event using the OpenRouter API and returns a structured result."""
+def _analyze_with_ollama(event_type: str, raw_log: str, source_ip: str) -> dict | None:
+    """Attempts to analyze a threat using a local Ollama instance."""
     prompt = (
         f"You are a cybersecurity analyst. Analyze this security event.\n"
         f"Event type: {event_type}\n"
@@ -47,57 +50,87 @@ def analyze_threat(event_type: str, raw_log: str, source_ip: str) -> dict:
         f"  recommendation (1 actionable sentence)."
     )
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "HTTP-Referer": "https://raven-soc.local",
-        "X-Title": "RAVEN 2.0",
-        "Content-Type": "application/json",
-    }
-
     payload = {
-        "model": AI_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
     }
-
-    fallback = {
-        "severity": "Medium",
-        "explanation": "Analysis unavailable — AI service not reachable.",
-        "recommendation": "Review the event manually.",
-    }
-
-    if not OPENROUTER_API_KEY:
-        return fallback
 
     try:
-        response = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=15)
+        response = requests.post(OLLAMA_URL, json=payload, timeout=10)
         response.raise_for_status()
         result = response.json()
 
-        content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        parsed = _extract_json(content)
+        content = result.get("response", "")
+        return _extract_json(content)
+    except Exception:
+        return None
 
-        if not parsed:
-            return fallback
 
-        severity = parsed.get("severity", "Medium")
-        if severity not in _VALID_SEVERITIES:
-            severity = "Medium"
+def analyze_threat(event_type: str, raw_log: str, source_ip: str) -> dict:
+    """Analyzes a security event using OpenRouter, with Ollama as fallback."""
+    prompt = (
+        f"You are a cybersecurity analyst. Analyze this security event.\n"
+        f"Event type: {event_type}\n"
+        f"Raw log: {raw_log}\n"
+        f"Source IP: {source_ip}\n"
+        f"Respond ONLY in JSON with these exact keys:\n"
+        f"  severity (one of: Low / Medium / High / Critical),\n"
+        f"  explanation (1 sentence plain English),\n"
+        f"  recommendation (1 actionable sentence)."
+    )
 
-        return {
-            "severity": severity,
-            "explanation": str(parsed.get("explanation", fallback["explanation"])),
-            "recommendation": str(parsed.get("recommendation", fallback["recommendation"])),
+    fallback = {
+        "severity": "Medium",
+        "explanation": "Analysis unavailable — AI services not reachable.",
+        "recommendation": "Review the event manually.",
+    }
+
+    # 1. Try OpenRouter
+    if OPENROUTER_API_KEY:
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "HTTP-Referer": "https://raven-soc.local",
+            "X-Title": "RAVEN 2.0",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": AI_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
         }
 
-    except requests.exceptions.Timeout:
-        print("[Analyzer] OpenRouter request timed out — using fallback.")
-        return fallback
-    except requests.exceptions.ConnectionError:
-        print("[Analyzer] Cannot reach OpenRouter — using fallback.")
-        return fallback
-    except Exception as e:
-        print(f"[Analyzer] Unexpected error: {e}")
-        return fallback
+        try:
+            response = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=15)
+            response.raise_for_status()
+            result = response.json()
+            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            parsed = _extract_json(content)
+            if parsed:
+                severity = parsed.get("severity", "Medium")
+                if severity not in _VALID_SEVERITIES:
+                    severity = "Medium"
+                return {
+                    "severity": severity,
+                    "explanation": str(parsed.get("explanation", fallback["explanation"])),
+                    "recommendation": str(parsed.get("recommendation", fallback["recommendation"])),
+                }
+        except Exception as e:
+            print(f"[Analyzer] OpenRouter failed: {e}. Trying Ollama fallback...")
+
+    # 2. Try Ollama
+    ollama_parsed = _analyze_with_ollama(event_type, raw_log, source_ip)
+    if ollama_parsed:
+        severity = ollama_parsed.get("severity", "Medium")
+        if severity not in _VALID_SEVERITIES:
+            severity = "Medium"
+        return {
+            "severity": severity,
+            "explanation": str(ollama_parsed.get("explanation", fallback["explanation"])),
+            "recommendation": str(ollama_parsed.get("recommendation", fallback["recommendation"])),
+        }
+
+    # 3. Final Static Fallback
+    return fallback
 
 def check_ip_reputation(ip: str) -> dict:
     """Queries AbuseIPDB API for IP reputation."""
@@ -108,7 +141,7 @@ def check_ip_reputation(ip: str) -> dict:
         "usage_type": "Unknown",
         "isp": "Unknown"
     }
-    
+
     if re.match(r"^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)", ip):
         fallback["is_public"] = False
         return fallback
@@ -125,7 +158,7 @@ def check_ip_reputation(ip: str) -> dict:
         "ipAddress": ip,
         "maxAgeInDays": 90
     }
-    
+
     try:
         response = requests.get(url, headers=headers, params=params, timeout=5)
         if response.status_code == 200:
