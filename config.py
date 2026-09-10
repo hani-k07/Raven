@@ -41,3 +41,7 @@ if __name__ == "__main__":
 # Scheduled Reporting
 REPORT_SCHEDULE = os.getenv("REPORT_SCHEDULE", "off") # "off", "daily", "weekly"
 REPORT_DELIVERY = os.getenv("REPORT_DELIVERY", "file") # "file", "telegram", "email", "all"
+
+# Enrichment APIs
+VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
+SHODAN_API_KEY = os.getenv("SHODAN_API_KEY")

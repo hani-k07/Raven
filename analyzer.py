@@ -3,7 +3,8 @@ import re
 import requests
 from config import (
     OPENROUTER_API_KEY, AI_MODEL, OPENROUTER_URL,
-    ABUSEIPDB_API_KEY, OLLAMA_URL, OLLAMA_MODEL
+    ABUSEIPDB_API_KEY, OLLAMA_URL, OLLAMA_MODEL,
+    VIRUSTOTAL_API_KEY, SHODAN_API_KEY
 )
 
 _VALID_SEVERITIES = {"Low", "Medium", "High", "Critical"}
@@ -183,3 +184,48 @@ if __name__ == "__main__":
         source_ip="192.168.1.100",
     )
     print(json.dumps(test_result, indent=2))
+
+def check_file_hash_reputation(sha256: str) -> dict:
+    """Queries VirusTotal v3 for file hash reputation."""
+    fallback = {"malicious": 0, "undetected": 0, "total_engines": 0, "verdict": "Unknown"}
+    if not VIRUSTOTAL_API_KEY:
+        return fallback
+
+    url = f"https://www.virustotal.com/api/v3/files/{sha256}"
+    headers = {"x-apikey": VIRUSTOTAL_API_KEY}
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            data = response.json().get("data", {}).get("attributes", {})
+            stats = data.get("last_analysis_stats", {})
+            return {
+                "malicious": stats.get("malicious", 0),
+                "undetected": stats.get("undetected", 0),
+                "total_engines": sum(stats.values()),
+                "verdict": "Malicious" if stats.get("malicious", 0) > 3 else "Clean"
+            }
+        return fallback
+    except Exception as e:
+        print(f"[Analyzer] VirusTotal error: {e}")
+        return fallback
+
+def check_ip_shodan(ip: str) -> dict:
+    """Queries Shodan for IP information and open ports."""
+    fallback = {"open_ports": [], "org": "Unknown", "vulns": 0}
+    if not SHODAN_API_KEY:
+        return fallback
+
+    url = f"https://api.shodan.io/host/{ip}?key={SHODAN_API_KEY}"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                "open_ports": data.get("ports", []),
+                "org": data.get("org", "Unknown"),
+                "vulns": len(data.get("vulns", []))
+            }
+        return fallback
+    except Exception as e:
+        print(f"[Analyzer] Shodan error: {e}")
+        return fallback

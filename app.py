@@ -173,40 +173,49 @@ class RavenApp(ctk.CTk):
         except Exception:
             self._geo_cache[ip] = "Lookup failed"
 
-    def _get_reputation(self, ip: str, progress_bar, score_label) -> None:
-        """Fetches reputation asynchronously and updates UI."""
+    def _get_reputation(self, ip: str, progress_bar, score_label):
+        """Fetches reputation and Shodan data asynchronously and updates UI."""
         if ip in self._reputation_cache:
             self._update_reputation_ui(self._reputation_cache[ip], progress_bar, score_label)
             return
 
         if self._PRIVATE_RE.match(ip):
-            data = {"abuse_score": 0, "total_reports": 0}
+            data = {"abuse_score": 0, "total_reports": 0, "shodan": {"open_ports": [], "org": "Unknown", "vulns": 0}}
             self._reputation_cache[ip] = data
             self._update_reputation_ui(data, progress_bar, score_label)
             return
 
         def worker():
-            data = analyzer.check_ip_reputation(ip)
+            # AbuseIPDB
+            reputation = analyzer.check_ip_reputation(ip)
+            # Shodan
+            shodan = analyzer.check_ip_shodan(ip)
+
+            data = {**reputation, "shodan": shodan}
             self._reputation_cache[ip] = data
             self.after(0, lambda: self._update_reputation_ui(data, progress_bar, score_label))
-            
+
         threading.Thread(target=worker, daemon=True).start()
 
     def _update_reputation_ui(self, data, progress_bar, score_label):
         try:
             score = data.get("abuse_score", 0)
             reports = data.get("total_reports", 0)
-            
+
             if score > 50:
                 color = CRITICAL
             elif score > 20:
                 color = HIGH_CLR
             else:
                 color = SAFE_CLR
-                
+
             progress_bar.configure(progress_color=color)
             progress_bar.set(score / 100.0)
-            score_label.configure(text=f"Reputation Risk: {score}/100 ({reports} reports)", text_color=color)
+
+            shodan = data.get("shodan", {})
+            shodan_info = f" | Shodan: {len(shodan.get('open_ports', []))} ports, {shodan.get('vulns', 0)} vulns" if shodan else ""
+
+            score_label.configure(text=f"Reputation Risk: {score}/100 ({reports} reports){shodan_info}", text_color=color)
         except Exception:
             pass
 
