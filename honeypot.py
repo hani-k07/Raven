@@ -370,7 +370,7 @@ def handle_connection(client_socket: socket.socket, client_address: tuple, port:
         sev_color = {
             "Critical": _RED, "High": _YEL, "Medium": _CYN,
         }.get(severity, _GRN)
-        print(f"  {sev_color}[{event_type:<20}]{_RST} {ip}:{attacker_port} → port {port} | {severity}")
+        print(f"  {sev_color}[{event_type:<20}]{_RST} {ip}:{attacker_port} -> port {port} | {severity}")
 
         # Write to database
         _db_write(timestamp, ip, port, payload, event_type, severity, raw_log)

@@ -120,6 +120,7 @@ python run.py
 # Terminal 1: Start RAVEN
 python run.py
 
-# Terminal 2: Run the attack simulator
-python demo_sim.py
+# Terminal 2: Trigger detections (e.g., attempt to connect to honeypot ports)
+# Use a separate machine or a tool like nmap to test:
+# nmap -p 2222,2121 <your-ip>
 ```

@@ -308,11 +308,8 @@ class RavenApp(ctk.CTk):
         self.btn_report.grid(row=9, column=0, padx=16, pady=4, sticky="new")
 
         # Bottom section
-        self.btn_inject = ctk.CTkButton(sb, text="  ⚠  Inject Test Threat", font=ctk.CTkFont(size=12), height=36, fg_color="transparent", border_width=1, border_color=CRITICAL, text_color=CRITICAL, hover_color="#1A0A10", corner_radius=8, command=self._test_alert)
-        self.btn_inject.grid(row=10, column=0, padx=16, pady=(10, 6), sticky="sew")
-
         self.btn_clear = ctk.CTkButton(sb, text="  ✕  Clear Database", font=ctk.CTkFont(size=12), height=36, fg_color="transparent", border_width=1, border_color=TEXT_MUTED, text_color=TEXT_MUTED, hover_color="#1A0A10", corner_radius=8, command=self._clear_db)
-        self.btn_clear.grid(row=11, column=0, padx=16, pady=(0, 20), sticky="sew")
+        self.btn_clear.grid(row=10, column=0, padx=16, pady=(10, 20), sticky="sew")
 
         self._nav_buttons = {
             "dashboard": self.nav_dashboard,
@@ -1049,39 +1046,6 @@ class RavenApp(ctk.CTk):
             finally:
                 self.btn_report.configure(state="normal", text="  📄  Export PDF")
         threading.Thread(target=worker, daemon=True).start()
-
-    def _test_alert(self):
-        try:
-            conn = self._db()
-            c = conn.cursor()
-            t = datetime.now().isoformat()
-            c.execute("""
-                INSERT INTO threats (timestamp, source_ip, event_type, raw_log, severity, ai_analysis, recommendation, alerted)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (t, "127.0.0.1", "SIMULATED_BREACH", "Manual injection from dashboard UI.", "Critical",
-                  "Automated system test — validating render pipeline and alert routing.", "Verify alert receipt on Telegram.", 0))
-            conn.commit()
-            conn.close()
-            check_and_alert()
-            self.after(100, self._refresh_current_tab)
-            
-            # Toast notification
-            toast = ctk.CTkToplevel(self)
-            toast.overrideredirect(True)
-            toast.configure(fg_color="#1E3A2F")
-            toast.attributes('-topmost', True)
-            
-            # Position at bottom-right
-            toast_w, toast_h = 220, 50
-            x = self.winfo_screenwidth() - toast_w - 40
-            y = self.winfo_screenheight() - toast_h - 60
-            toast.geometry(f"{toast_w}x{toast_h}+{x}+{y}")
-            
-            ctk.CTkLabel(toast, text="✓ Test threat injected", font=ctk.CTkFont(size=14, weight="bold"), text_color="#00F58A").pack(expand=True, fill="both", padx=10, pady=5)
-            
-            self.after(2000, toast.destroy)
-        except Exception:
-            pass
 
     def _clear_db(self):
         dialog = ctk.CTkToplevel(self)

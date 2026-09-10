@@ -75,6 +75,8 @@ def reset_db():
     cursor.execute("DROP TABLE IF EXISTS threats;")
     cursor.execute("DROP TABLE IF EXISTS audit_results;")
     cursor.execute("DROP TABLE IF EXISTS honeypot_events;")
+    cursor.execute("DROP TABLE IF EXISTS process_baseline;")
+    cursor.execute("DROP TABLE IF EXISTS ip_allowlist;")
     conn.commit()
     conn.close()
     print("All tables dropped.")

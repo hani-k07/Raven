@@ -14,9 +14,11 @@ psutil==5.9.8
 
 # Networking
 requests==2.33.1
-scapy==2.6.0
 aiohttp==3.10.0
 
 # Notifications
 plyer==2.1.0
 pystray==0.19.4
+
+# Testing
+pytest==8.3.2

@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  raven:
+    build: .
+    container_name: raven-soc
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    restart: unless-stopped

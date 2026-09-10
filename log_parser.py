@@ -3,7 +3,7 @@ import re
 import sqlite3
 from pathlib import Path
 from colorama import init, Fore
-from config import LOG_FILE_LINUX, LOG_FILE_WINDOWS, WEB_LOG_PATH
+import config
 from analyzer import analyze_threat
 from datetime import datetime
 import honeypot
@@ -60,7 +60,7 @@ def _insert_threat(timestamp: str, source_ip: str, event_type: str, raw_log: str
 
 def _parse_linux_logs() -> list[dict]:
     """Parses Linux auth.log."""
-    log_path = Path(LOG_FILE_LINUX)
+    log_path = Path(config.LOG_FILE_LINUX)
     if not log_path.exists():
         print(f"Log file not found: {log_path}")
         return []
@@ -231,8 +231,8 @@ def parse_logs() -> list[dict]:
     else:
         print(f"Unsupported OS for log parsing: {os_name}")
 
-    if WEB_LOG_PATH:
-        results.extend(_parse_web_server_logs(WEB_LOG_PATH))
+    if config.WEB_LOG_PATH:
+        results.extend(_parse_web_server_logs(config.WEB_LOG_PATH))
 
     return results
 

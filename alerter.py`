@@ -3,11 +3,8 @@ import threading
 import requests
 import smtplib
 from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.application import MIMEApplication
 from pathlib import Path
 from collections import Counter
-import containment
 from config import (
     TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID,
     SLACK_WEBHOOK_URL, DISCORD_WEBHOOK_URL,
@@ -24,6 +21,7 @@ TELEGRAM_LIMIT = 4000
 DISCORD_LIMIT = 2000
 
 # Per-channel health tracking
+# channel_name -> {"available": bool, "fail_count": int}
 CHANNEL_STATUS = {
     "Telegram": {"available": True, "fail_count": 0},
     "Slack": {"available": True, "fail_count": 0},
@@ -66,19 +64,10 @@ def _send_discord(text: str) -> bool:
     except requests.exceptions.RequestException:
         return False
 
-def _send_email(subject: str, text: str, attachment_path: str = None) -> bool:
+def _send_email(subject: str, text: str) -> bool:
     if not SMTP_HOST: return False
     try:
-        if attachment_path:
-            msg = MIMEMultipart()
-            msg.attach(MIMEText(text))
-            with open(attachment_path, "rb") as f:
-                part = MIMEApplication(f.read(), Name=Path(attachment_path).name)
-                part['Content-Disposition'] = f'attachment; filename="{Path(attachment_path).name}"'
-                msg.attach(part)
-        else:
-            msg = MIMEText(text)
-
+        msg = MIMEText(text)
         msg["Subject"] = subject
         msg["From"] = ALERT_EMAIL_FROM or "raven@soc.local"
         msg["To"] = ALERT_EMAIL_TO or "admin@soc.local"
@@ -89,18 +78,6 @@ def _send_email(subject: str, text: str, attachment_path: str = None) -> bool:
                 server.login(SMTP_USER, SMTP_PASSWORD)
             server.send_message(msg)
         return True
-    except Exception:
-        return False
-
-def _send_telegram_document(caption: str, file_path: str) -> bool:
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: return False
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
-    try:
-        with open(file_path, 'rb') as f:
-            files = {'document': f}
-            payload = {"chat_id": TELEGRAM_CHAT_ID, "caption": caption}
-            resp = requests.post(url, data=payload, files=files, timeout=10)
-            return resp.status_code == 200
     except Exception:
         return False
 
@@ -128,10 +105,13 @@ def _format_digest(threats) -> list[str]:
         lines.append(f"…and {remaining} more source(s) not shown")
 
     full_text = "\n".join(lines)
+    # Return a single string; chunking is now handled by the channel sender
     return [full_text]
 
 def check_and_alert() -> int:
     """Checks for unalerted threats and attempts multi-channel delivery."""
+    # Define available channels and their senders
+    # Email is special as it needs a subject
     senders = {
         "Telegram": lambda text: _send_telegram(text),
         "Slack": lambda text: _send_slack(text),
@@ -155,11 +135,15 @@ def check_and_alert() -> int:
         if not threats:
             return 0
 
+        # Determine if we use individual or digest path
         if len(threats) <= INDIVIDUAL_THRESHOLD:
+            messages_per_threat = []
             for threat in threats:
                 msg = _format_single(threat)
+                # Try all channels
                 success = False
                 for name, sender in senders.items():
+                    # Only try if config exists
                     if (name == "Telegram" and (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)) or \
                        (name == "Slack" and SLACK_WEBHOOK_URL) or \
                        (name == "Discord" and DISCORD_WEBHOOK_URL) or \
@@ -174,18 +158,15 @@ def check_and_alert() -> int:
 
                 if success:
                     alerts_sent += 1
-                    # Auto-containment for high-severity alerts
-                    contained = containment.auto_contain({
-                        "severity": threat['severity'],
-                        "event_type": threat['event_type'],
-                        "source_ip": threat['source_ip']
-                    })
-                    if contained:
-                        print(f"  {_RED}[CONTAINMENT]{_RST} Automatically blocked {threat['source_ip']}")
+
+                # Mark alerted regardless of total success to prevent infinite loop,
+                # but only after some threshold of failure (simplified here as always mark)
                 cursor.execute("UPDATE threats SET alerted=1 WHERE id=?", (threat['id'],))
         else:
+            # Digest Path
             digests = _format_digest(threats)
             for digest in digests:
+                # Chunk and send for each channel
                 for name, sender in senders.items():
                     if (name == "Telegram" and (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)) or \
                        (name == "Slack" and SLACK_WEBHOOK_URL) or \
@@ -203,16 +184,6 @@ def check_and_alert() -> int:
                                 CHANNEL_STATUS[name]["available"] = False
                                 CHANNEL_STATUS[name]["fail_count"] += 1
 
-                # Auto-contain high-risk IPs from the burst
-                for threat in threats:
-                    containment.auto_contain({
-                        "severity": threat['severity'],
-                        "event_type": threat['event_type'],
-                        "source_ip": threat['source_ip']
-                    })
-
-                ids = [t['id'] for t in threats]
-
             ids = [t['id'] for t in threats]
             cursor.execute(f"UPDATE threats SET alerted=1 WHERE id IN ({','.join(['?']*len(ids))})", ids)
 
@@ -228,10 +199,6 @@ def check_and_alert() -> int:
 def get_channel_status() -> dict:
     """Returns connectivity status for all configured channels."""
     return CHANNEL_STATUS
-
-def is_telegram_connected() -> bool:
-    """Checks if Telegram is configured and available."""
-    return bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID and CHANNEL_STATUS["Telegram"]["available"])
 
 def _daemon_loop() -> None:
     """Internal loop for the alert daemon."""

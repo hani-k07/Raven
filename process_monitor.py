@@ -35,10 +35,13 @@ def get_listening_ports() -> list[dict]:
 def check_for_new_ports() -> list[dict]:
     """Compares current listening ports against the baseline and reports anomalies."""
     current_ports = get_listening_ports()
+    print(f"[Debug] Current ports: {len(current_ports)}")
+    print(f"[Debug] DB Path: {DB_PATH}")
     anomalies = []
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    print(f"[Debug] Baseline count: {cursor.execute('SELECT count(*) FROM process_baseline').fetchone()[0]}")
 
     for p in current_ports:
         port = p["port"]
@@ -125,7 +128,7 @@ def monitor_system() -> None:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (timestamp, "local", anomaly["type"], raw_log, anomaly["severity"],
               ai_analysis["explanation"], ai_analysis["recommendation"], 0))
-        print(f"[ProcessMonitor] 🚨 {anomaly['severity']} - {anomaly['type']} on port {anomaly['port']}")
+        print(f"[ProcessMonitor] ALERT {anomaly['severity']} - {anomaly['type']} on port {anomaly['port']}")
 
     # 2. Check outbound connections
     outbound = check_outbound_reputation()
