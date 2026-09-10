@@ -810,6 +810,21 @@ class RavenApp(ctk.CTk):
         plt.close(fig3)
 
     # ── Actions ────────────────────────────────────────────
+    def _get_next_report_time(self):
+        from config import REPORT_SCHEDULE
+        if REPORT_SCHEDULE == "off":
+            return "Off"
+
+        now = datetime.now()
+        if REPORT_SCHEDULE == "daily":
+            tomorrow = now + timedelta(days=1)
+            return tomorrow.replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%d %H:%M")
+        elif REPORT_SCHEDULE == "weekly":
+            days_ahead = 0 - now.weekday()
+            if days_ahead <= 0: days_ahead += 7
+            return (now + timedelta(days=days_ahead)).replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%d %H:%M")
+        return "Unknown"
+
     def _show_settings(self):
         self._set_active_nav("settings")
         self._clear_content()
@@ -873,6 +888,8 @@ class RavenApp(ctk.CTk):
         footer = ctk.CTkFrame(scroll_frame, fg_color="transparent")
         footer.pack(fill="x", padx=10, pady=20)
 
+        next_report = self._get_next_report_time()
+        ctk.CTkLabel(footer, text=f"Next scheduled report: {next_report}", font=ctk.CTkFont(size=12), text_color=TEXT_SECONDARY).pack(pady=(0, 5))
         ctk.CTkLabel(footer, text="⚠️ Changing settings requires a system restart to take effect.", font=ctk.CTkFont(size=12), text_color=HIGH_CLR).pack(pady=(0, 10))
 
         self.btn_save_settings = ctk.CTkButton(

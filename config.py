@@ -37,3 +37,7 @@ def validate_config():
 
 if __name__ == "__main__":
     validate_config()
+
+# Scheduled Reporting
+REPORT_SCHEDULE = os.getenv("REPORT_SCHEDULE", "off") # "off", "daily", "weekly"
+REPORT_DELIVERY = os.getenv("REPORT_DELIVERY", "file") # "file", "telegram", "email", "all"

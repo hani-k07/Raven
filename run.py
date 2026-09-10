@@ -45,6 +45,49 @@ def process_monitor_daemon():
             print(f"{Fore.RED}[DAEMON] Process monitor error: {e}")
         time.sleep(60)
 
+def report_scheduler_daemon():
+    """Schedules and delivers automatic PDF reports."""
+    from config import REPORT_SCHEDULE, REPORT_DELIVERY
+    import report_generator
+    import alerter
+
+    if REPORT_SCHEDULE == "off":
+        return
+
+    while True:
+        now = datetime.now()
+        if REPORT_SCHEDULE == "daily":
+            # Next midnight
+            tomorrow = now + timedelta(days=1)
+            next_run = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif REPORT_SCHEDULE == "weekly":
+            # Next Monday midnight
+            days_ahead = 0 - now.weekday() # Monday is 0
+            if days_ahead <= 0: days_ahead += 7
+            next_run = (now + timedelta(days=days_ahead)).replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            break
+
+        sleep_seconds = (next_run - now).total_seconds()
+        print(f"{Fore.CYAN}[SCHEDULER] Next report scheduled for {next_run} (in {sleep_seconds:.0f}s)")
+        time.sleep(sleep_seconds)
+
+        try:
+            print(f"{Fore.CYAN}[SCHEDULER] Generating scheduled report...")
+            out_dir = Path(__file__).parent / "reports"
+            out_dir.mkdir(exist_ok=True)
+            report_path = report_generator.generate_report(out_dir)
+
+            # Delivery
+            if REPORT_DELIVERY in ("email", "all"):
+                alerter._send_email("RAVEN Scheduled Report", "Please find the attached security report.", str(report_path))
+            if REPORT_DELIVERY in ("telegram", "all"):
+                alerter._send_telegram_document("📦 RAVEN Scheduled Security Report", str(report_path))
+
+            print(f"{Fore.GREEN}[SCHEDULER] Report delivered via {REPORT_DELIVERY}")
+        except Exception as e:
+            print(f"{Fore.RED}[SCHEDULER] Error: {e}")
+
 def main():
     print(ASCII_ART)
     print(f"{Fore.YELLOW}Initializing RAVEN 2.0...\n")
@@ -93,6 +136,10 @@ def main():
     print(f"{Fore.GREEN}[5.1/6] Starting System Anomaly Watchdog...")
     proc_thread = threading.Thread(target=process_monitor_daemon, daemon=True)
     proc_thread.start()
+
+    print(f"{Fore.GREEN}[5.2/6] Starting Report Scheduler...")
+    rep_thread = threading.Thread(target=report_scheduler_daemon, daemon=True)
+    rep_thread.start()
 
     print(f"{Fore.GREEN}[6/6] Starting CustomTkinter Dashboard and Alert System...")
     app.run_app()
