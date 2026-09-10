@@ -37,6 +37,14 @@ def init_db():
     """)
 
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS process_baseline (
+            port INTEGER PRIMARY KEY,
+            process_name TEXT,
+            first_seen TEXT
+        );
+    """)
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS audit_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             check_name TEXT,
