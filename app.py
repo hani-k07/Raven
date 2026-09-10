@@ -285,8 +285,11 @@ class RavenApp(ctk.CTk):
         self.nav_analytics = ctk.CTkButton(sb, text="  📊  Analytics", fg_color="transparent", text_color=TEXT_SECONDARY, hover_color=BG_CARD, command=self._show_analytics, **btn_cfg)
         self.nav_analytics.grid(row=6, column=0, padx=12, pady=3, sticky="ew")
 
+        self.nav_settings = ctk.CTkButton(sb, text="  ⚙  Settings", fg_color="transparent", text_color=TEXT_SECONDARY, hover_color=BG_CARD, command=self._show_settings, **btn_cfg)
+        self.nav_settings.grid(row=7, column=0, padx=12, pady=3, sticky="ew")
+
         # Separator
-        ctk.CTkFrame(sb, height=1, fg_color=BORDER_CLR).grid(row=7, column=0, sticky="ew", padx=16, pady=15)
+        ctk.CTkFrame(sb, height=1, fg_color=BORDER_CLR).grid(row=8, column=0, sticky="ew", padx=16, pady=15)
 
         # Action buttons
         self.btn_scan = ctk.CTkButton(sb, text="  🛡  Run Full Scan", font=ctk.CTkFont(size=13, weight="bold"), height=40, fg_color=ACCENT, text_color="#000", hover_color=ACCENT_DIM, corner_radius=8, command=self._run_scan)
@@ -307,6 +310,7 @@ class RavenApp(ctk.CTk):
             "threats": self.nav_threats,
             "audit": self.nav_audit,
             "analytics": self.nav_analytics,
+            "settings": self.nav_settings,
         }
 
     def _set_active_nav(self, name):
@@ -783,6 +787,132 @@ class RavenApp(ctk.CTk):
         plt.close(fig3)
 
     # ── Actions ────────────────────────────────────────────
+    def _show_settings(self):
+        self._set_active_nav("settings")
+        self._clear_content()
+
+        header = ctk.CTkFrame(self.content, fg_color=BG_DARK, height=50)
+        header.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
+        ctk.CTkLabel(header, text="System Settings", font=ctk.CTkFont(size=22, weight="bold"), text_color=TEXT_PRIMARY).pack(side="left")
+
+        scroll_frame = ctk.CTkScrollableFrame(self.content, fg_color=BG_DARK, scrollbar_button_color=BG_ELEVATED)
+        scroll_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
+
+        # Settings definition: (Label, EnvKey, is_secret)
+        settings_fields = [
+            ("OpenRouter API Key", "OPENROUTER_API_KEY", True),
+            ("AbuseIPDB API Key", "ABUSEIPDB_API_KEY", True),
+            ("Telegram Bot Token", "TELEGRAM_BOT_TOKEN", True),
+            ("Telegram Chat ID", "TELEGRAM_CHAT_ID", False),
+            ("Honeypot Ports", "HONEYPOT_PORTS", False),
+            ("AI Model", "AI_MODEL", False),
+            ("Slack Webhook URL", "SLACK_WEBHOOK_URL", False),
+            ("Discord Webhook URL", "DISCORD_WEBHOOK_URL", False),
+            ("SMTP Host", "SMTP_HOST", False),
+            ("SMTP Port", "SMTP_PORT", False),
+            ("SMTP User", "SMTP_USER", False),
+            ("SMTP Password", "SMTP_PASSWORD", True),
+            ("Ollama URL", "OLLAMA_URL", False),
+            ("Ollama Model", "OLLAMA_MODEL", False),
+        ]
+
+        self.settings_entries = {}
+        for label, key, is_secret in settings_fields:
+            card = ctk.CTkFrame(scroll_frame, fg_color=BG_CARD, corner_radius=8, border_width=1, border_color=BORDER_CLR)
+            card.pack(fill="x", padx=10, pady=5)
+
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=13, weight="bold"), text_color=TEXT_PRIMARY).pack(side="left", padx=15, pady=10)
+
+            # Load current value from .env manually to avoid cached config.py values
+            current_val = ""
+            try:
+                with open(".env", "r") as f:
+                    for line in f:
+                        if line.startswith(f"{key}="):
+                            current_val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            break
+            except Exception:
+                pass
+
+            entry = ctk.CTkEntry(
+                card,
+                width=400,
+                show="*" if is_secret else "",
+                fg_color=BG_ELEVATED,
+                text_color=TEXT_PRIMARY,
+                border_color=BORDER_CLR
+            )
+            entry.insert(0, current_val)
+            entry.pack(side="right", padx=15, pady=10)
+            self.settings_entries[key] = entry
+
+        # Footer Actions
+        footer = ctk.CTkFrame(scroll_frame, fg_color="transparent")
+        footer.pack(fill="x", padx=10, pady=20)
+
+        ctk.CTkLabel(footer, text="⚠️ Changing settings requires a system restart to take effect.", font=ctk.CTkFont(size=12), text_color=HIGH_CLR).pack(pady=(0, 10))
+
+        self.btn_save_settings = ctk.CTkButton(
+            footer, text="Save Settings",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            height=40, fg_color=ACCENT, text_color="#000",
+            hover_color=ACCENT_DIM, corner_radius=8,
+            command=self._save_settings
+        )
+        self.btn_save_settings.pack()
+
+    def _save_settings(self):
+        try:
+            # Read existing .env to preserve unrelated keys
+            lines = []
+            if os.path.exists(".env"):
+                with open(".env", "r") as f:
+                    lines = f.readlines()
+
+            # Update or append new values
+            updated_keys = set()
+            new_lines = []
+            for line in lines:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    new_lines.append(line)
+                    continue
+
+                if "=" in stripped:
+                    key = stripped.split("=", 1)[0].strip()
+                    if key in self.settings_entries:
+                        val = self.settings_entries[key].get()
+                        new_lines.append(f"{key}=\"{val}\"\n")
+                        updated_keys.add(key)
+                        continue
+                new_lines.append(line)
+
+            # Append keys that weren't in the file
+            for key, entry in self.settings_entries.items():
+                if key not in updated_keys:
+                    val = entry.get()
+                    new_lines.append(f"{key}=\"{val}\"\n")
+
+            with open(".env", "w") as f:
+                f.writelines(new_lines)
+
+            # Toast notification (reuse _test_alert pattern)
+            toast = ctk.CTkToplevel(self)
+            toast.overrideredirect(True)
+            toast.configure(fg_color="#1E3A2F")
+            toast.attributes('-topmost', True)
+
+            toast_w, toast_h = 220, 50
+            x = self.winfo_screenwidth() - toast_w - 40
+            y = self.winfo_screenheight() - toast_h - 60
+            toast.geometry(f"{toast_w}x{toast_h}+{x}+{y}")
+
+            ctk.CTkLabel(toast, text="✓ Settings Saved", font=ctk.CTkFont(size=14, weight="bold"), text_color="#00F58A").pack(expand=True, fill="both", padx=10, pady=5)
+            self.after(2000, toast.destroy)
+
+        except Exception as e:
+            print(f"Save settings error: {e}")
+
     def _run_scan(self):
         def worker():
             self.btn_scan.configure(state="disabled", text="  ⏳  Scanning...")
@@ -911,6 +1041,8 @@ class RavenApp(ctk.CTk):
             self._show_audit()
         elif self._current_tab == "analytics":
             self._show_analytics()
+        elif self._current_tab == "settings":
+            self._show_settings()
 
     def _tick_refresh(self):
         """Lightweight periodic check — only rebuilds UI if data changed."""
