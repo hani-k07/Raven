@@ -22,6 +22,20 @@ def init_db():
         );
     """)
 
+    # Add false_positive column if missing
+    try:
+        cursor.execute("ALTER TABLE threats ADD COLUMN false_positive BOOLEAN DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass # Column already exists
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ip_allowlist (
+            ip TEXT PRIMARY KEY,
+            reason TEXT,
+            added_at TEXT
+        );
+    """)
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS audit_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

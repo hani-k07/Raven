@@ -242,6 +242,15 @@ def _read_full_session(client_socket: socket.socket, max_bytes: int = 4096) -> s
     return b"".join(chunks).decode("utf-8", errors="replace")
 
 
+def _is_ip_allowlisted(ip: str) -> bool:
+    """Checks if an IP is in the allowlist."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM ip_allowlist WHERE ip = ?", (ip,))
+    exists = cursor.fetchone() is not None
+    conn.close()
+    return exists
+
 def _db_write(timestamp: str, ip: str, port: int, payload: str,
               event_type: str, severity: str, raw_log: str):
     """Write event to both honeypot_events and threats tables.
@@ -275,6 +284,11 @@ def _db_write(timestamp: str, ip: str, port: int, payload: str,
                 severity = ai_sev
         except Exception:
             pass  # Fall back to local classification
+
+        # Check allowlist
+        if _is_ip_allowlisted(ip):
+            severity = "Low"
+            ai_analysis = f"[ALLOWLISTED] {ai_analysis}"
 
         cursor.execute(
             "INSERT INTO threats (timestamp, source_ip, event_type, raw_log, severity, ai_analysis, recommendation, alerted) "
