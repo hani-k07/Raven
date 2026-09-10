@@ -3,7 +3,7 @@
 | Feature | Description | Status |
 |---------|-------------|--------|
 | Feature 7 | Local LLM fallback (Ollama) | [x] Done |
-| Feature 8 | Settings tab in the UI | [ ] Pending |
+| Feature 8 | Settings tab in the UI | [x] Done |
 | Feature 9 | False-positive feedback loop | [ ] Pending |
 | Feature 10 | Process / network anomaly watch (psutil) | [ ] Pending |
 | Feature 11 | Scheduled / automatic PDF reports | [ ] Pending |
