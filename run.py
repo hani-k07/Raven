@@ -44,7 +44,21 @@ def main():
     except Exception as e:
         print(f"{Fore.RED}Configuration Error: {e}")
         return
-        
+
+    # Check for Local LLM (Ollama) availability
+    from config import OLLAMA_URL
+    import requests
+    try:
+        # Ping the base host briefly (OLLama usually responds to / with 404 or similar,
+        # but a connection is a good sign)
+        from urllib.parse import urlparse
+        parsed = urlparse(OLLAMA_URL)
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        requests.get(base_url, timeout=2)
+        print(f"{Fore.CYAN}[INFO] Local LLM fallback (Ollama) is available.")
+    except Exception:
+        print(f"{Fore.YELLOW}[INFO] Local LLM fallback (Ollama) is offline or not configured.")
+
     print(f"{Fore.GREEN}[2/6] Initializing database...")
     db_init.init_db()
     

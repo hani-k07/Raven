@@ -1,4 +1,5 @@
 # Python 3.10+ required. Install with: pip install -r requirements.txt
+# Note: Ollama must be installed and running separately for local LLM fallback.
 
 # Core UI
 customtkinter==5.2.2
