@@ -65,6 +65,30 @@ MITRE_MAP = {
         "technique_id": "T1041",
         "technique_name": "Exfiltration Over C2 Channel",
     },
+    "WIN_4648": {
+        "tactic_id": "TA0008",
+        "tactic_name": "Lateral Movement",
+        "technique_id": "T1550",
+        "technique_name": "Use Alternate Authentication Material",
+    },
+    "WIN_4672": {
+        "tactic_id": "TA0004",
+        "tactic_name": "Privilege Escalation",
+        "technique_id": "T1078.003",
+        "technique_name": "Valid Accounts: Local Accounts",
+    },
+    "WIN_4720": {
+        "tactic_id": "TA0003",
+        "tactic_name": "Persistence",
+        "technique_id": "T1136",
+        "technique_name": "Create Account",
+    },
+    "SUSPICIOUS_WEB_REQUEST": {
+        "tactic_id": "TA0001",
+        "tactic_name": "Initial Access",
+        "technique_id": "T1190",
+        "technique_name": "Exploit Public-Facing Application",
+    },
 }
 
 def get_mitre(event_type: str) -> dict:
