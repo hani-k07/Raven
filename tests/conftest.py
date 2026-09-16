@@ -15,6 +15,8 @@ def temp_db(tmp_path, monkeypatch):
     monkeypatch.setattr("fim.DB_PATH", db_file)
     monkeypatch.setattr("process_monitor.DB_PATH", db_file)
     monkeypatch.setattr("alerter.DB_PATH", db_file)
+    monkeypatch.setattr("auditor.DB_PATH", db_file)
+    monkeypatch.setattr("report_generator.DB_PATH", db_file)
 
     # Initialize the database
     db_init.init_db()
