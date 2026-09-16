@@ -1,5 +1,9 @@
 # Security & Data Integrity Policy
 
+## Responsible Disclosure
+
+If you discover a security vulnerability in RAVEN 2.0, please report it responsibly. Do not open a public issue for critical vulnerabilities. Instead, please contact the maintainer directly via the contact information provided in the repository profile. We appreciate your help in keeping the system secure.
+
 ## Data Integrity Guarantee
 RAVEN 2.0 is designed as a high-fidelity defensive tool. To maintain the trustworthiness of its telemetry and forensic reports, the system adheres to a strict **Data Integrity Guarantee**:
 
