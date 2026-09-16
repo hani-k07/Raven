@@ -2,19 +2,15 @@ import platform
 import re
 import sqlite3
 from pathlib import Path
-from colorama import init, Fore
 import config
 from analyzer import analyze_threat
 from datetime import datetime
 import honeypot
-
-init(autoreset=True)
-
-DB_PATH = Path(__file__).parent / "raven.db"
+import db_init
 
 def _is_ip_allowlisted(ip: str) -> bool:
     """Checks if an IP is in the allowlist."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_init.DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT 1 FROM ip_allowlist WHERE ip = ?", (ip,))
     exists = cursor.fetchone() is not None
@@ -31,7 +27,7 @@ def _insert_threat(timestamp: str, source_ip: str, event_type: str, raw_log: str
         severity = "Low"
         explanation = f"[ALLOWLISTED] {explanation}"
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_init.DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO threats (timestamp, source_ip, event_type, raw_log, severity, ai_analysis, recommendation, alerted)
@@ -49,14 +45,7 @@ def _insert_threat(timestamp: str, source_ip: str, event_type: str, raw_log: str
     conn.commit()
     conn.close()
 
-    color_map = {
-        "Critical": Fore.RED,
-        "High": Fore.YELLOW,
-        "Medium": Fore.CYAN,
-        "Low": Fore.WHITE
-    }
-    color = color_map.get(severity, Fore.WHITE)
-    print(f"{color}[{severity}] {event_type} from {source_ip}: {ai_analysis.get('explanation', '')}")
+    print(f"[{severity}] {event_type} from {source_ip}: {ai_analysis.get('explanation', '')}")
 
 def _parse_linux_logs() -> list[dict]:
     """Parses Linux auth.log."""

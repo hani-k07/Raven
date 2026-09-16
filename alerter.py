@@ -14,8 +14,7 @@ from config import (
     SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD,
     ALERT_EMAIL_FROM, ALERT_EMAIL_TO
 )
-
-DB_PATH = Path(__file__).parent / "raven.db"
+import db_init
 
 # Burst protection constants
 INDIVIDUAL_THRESHOLD = 3
@@ -106,12 +105,12 @@ def _send_telegram_document(caption: str, file_path: str) -> bool:
 
 def _format_single(threat) -> str:
     return (
-        f"🚨 RAVEN ALERT [{threat['severity']}]\n"
+        f"RAVEN ALERT [{threat['severity']}]\n"
         f"Time: {threat['timestamp']}\n"
         f"Type: {threat['event_type']}\n"
         f"IP:   {threat['source_ip']}\n"
         f"Analysis: {threat['ai_analysis']}\n"
-        f"Action: {threat['recommendation']}"
+        f"Recommended action: {threat['recommendation']}"
     )
 
 def _format_digest(threats) -> list[str]:
@@ -120,12 +119,12 @@ def _format_digest(threats) -> list[str]:
     top_groups = sorted_groups[:DIGEST_MAX_GROUPS]
     remaining = len(sorted_groups) - DIGEST_MAX_GROUPS
 
-    lines = ["📦 RAVEN BURST DIGEST"]
+    lines = ["RAVEN BURST DIGEST"]
     for (ip, etype, sev), count in top_groups:
         suffix = f" x{count}" if count > 1 else ""
-        lines.append(f"• {sev} | {etype} | {ip}{suffix}")
+        lines.append(f"- {sev} | {etype} | {ip}{suffix}")
     if remaining > 0:
-        lines.append(f"…and {remaining} more source(s) not shown")
+        lines.append(f"...and {remaining} more source(s) not shown")
 
     full_text = "\n".join(lines)
     return [full_text]
@@ -141,7 +140,7 @@ def check_and_alert() -> int:
 
     alerts_sent = 0
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(db_init.DB_PATH)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 

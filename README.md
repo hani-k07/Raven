@@ -7,7 +7,7 @@
 
 RAVEN 2.0 is a professional-grade, autonomous SIEM (Security Information and Event Management) system designed to bridge the gap between raw system logs and actionable security intelligence. It transforms fragmented telemetry into high-fidelity threat alerts by combining active network deception, behavioral analysis, and Large Language Model (LLM) triage.
 
-## 🚀 Key Features
+## Key Features
 
 - **Real-Time Log Monitoring**: Proactive ingestion of Windows Event Logs and Linux `auth.log` to identify brute-force attacks and unauthorized access.
 - **Active Honeypot Deception**: Deploys adaptive deception layers to ensnare reconnaissance attempts and identify attackers before they reach critical assets.
@@ -18,7 +18,7 @@ RAVEN 2.0 is a professional-grade, autonomous SIEM (Security Information and Eve
 - **Automated Forensic Reporting**: Generates professional PDF, CSV, and JSON dossiers for compliance audits and post-incident review.
 - **File Integrity Monitoring (FIM)**: Tracks unauthorized changes to sensitive system files to detect persistence mechanisms and privilege escalation.
 
-## 📸 Screenshots
+## Screenshots
 
 *(I can't generate real screenshots of the live GUI — you need to run the app with a display, capture the dashboard, a threat detail view, and the PDF report, and drop them in `docs/screenshots/` before this section will render properly.)*
 
@@ -26,7 +26,7 @@ RAVEN 2.0 is a professional-grade, autonomous SIEM (Security Information and Eve
 | :---: | :---: | :---: |
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Threat Detail](docs/screenshots/threat-detail.png) | ![Report](docs/screenshots/report.png) |
 
-## ⚡ Quick Start
+## Quick Start
 
 ```bash
 # 1. Clone the repository
@@ -49,7 +49,7 @@ cp .env.example .env
 python run.py
 ```
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Language**: Python 3.10+
 - **GUI Framework**: CustomTkinter (Modern themed UI)
@@ -59,7 +59,7 @@ python run.py
 - **Reporting**: ReportLab (PDF), Matplotlib (Visualizations)
 - **System**: psutil, os, re, socket
 
-## 🛡 Data Integrity Guarantee
+## Data Integrity Guarantee
 
 To ensure the credibility of its forensic output, RAVEN 2.0 implements a strict **Data Integrity Guarantee**. Every threat record in the database originates exclusively from the real-time detection pipeline:
 - `log_parser.py` (Log telemetry)
@@ -69,7 +69,7 @@ To ensure the credibility of its forensic output, RAVEN 2.0 implements a strict 
 
 **No manual threat injection paths exist in the production codebase.** This guarantee is programmatically enforced via a custom security check in the CI/CD pipeline that fails the build if any unauthorized `INSERT INTO threats` calls are detected outside these specific modules.
 
-## 🧪 Running Tests
+## Running Tests
 
 ```bash
 # Run the full test suite

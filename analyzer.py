@@ -1,6 +1,7 @@
 import json
 import re
 import requests
+import os
 from config import (
     OPENROUTER_API_KEY, AI_MODEL, OPENROUTER_URL,
     ABUSEIPDB_API_KEY, OLLAMA_URL, OLLAMA_MODEL,
@@ -83,14 +84,15 @@ def analyze_threat(event_type: str, raw_log: str, source_ip: str) -> dict:
 
     fallback = {
         "severity": "Medium",
-        "explanation": "Analysis unavailable — AI services not reachable.",
+        "explanation": "Analysis unavailable - AI services not reachable.",
         "recommendation": "Review the event manually.",
     }
 
     # 1. Try OpenRouter
-    if OPENROUTER_API_KEY:
+    api_key = os.getenv("OPENROUTER_API_KEY") or OPENROUTER_API_KEY
+    if api_key:
         headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "HTTP-Referer": "https://raven-soc.local",
             "X-Title": "RAVEN 2.0",
             "Content-Type": "application/json",

@@ -10,9 +10,9 @@ def db_setup(tmp_path, monkeypatch):
     db_file = tmp_path / "test_raven_p9.db"
     db_path_str = str(db_file)
 
-    # Monkeypatch DB_PATH in log_parser and others
-    import log_parser
-    monkeypatch.setattr(log_parser, "DB_PATH", db_file)
+    # Monkeypatch the central DB_PATH in db_init
+    import db_init
+    monkeypatch.setattr(db_init, "DB_PATH", db_file)
 
     # Create tables
     conn = sqlite3.connect(db_path_str)

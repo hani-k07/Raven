@@ -24,7 +24,7 @@ import analyzer
 
 DB_PATH = Path(__file__).parent / "raven.db"
 
-# ── Color Palette ──────────────────────────────────────────
+# --- Color Palette --------------------------------------------
 BG_DARK      = "#0B0D0F"
 BG_SURFACE   = "#12161A"
 BG_CARD      = "#181C22"
@@ -50,11 +50,11 @@ SEVERITY_COLORS = {
     "Low": LOW_CLR,
 }
 
-# ── Main Application ──────────────────────────────────────
+# --- Main Application --------------------------------------
 class RavenApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("RAVEN 2.0 — Autonomous Defense Matrix")
+        self.title("RAVEN 2.0 - Autonomous Defense Matrix")
         self.geometry("1150x780")
         self.minsize(900, 600)
         self.configure(fg_color=BG_DARK)
@@ -86,7 +86,7 @@ class RavenApp(ctk.CTk):
         self._animate_scanline()
         self._tick_refresh()
 
-    # ── Database ───────────────────────────────────────────
+    # --- Database -----------------------------------------------
     def _db(self):
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
@@ -137,7 +137,7 @@ class RavenApp(ctk.CTk):
         conn.close()
         return rows
 
-    # ── IP Geolocation ────────────────────────────────────
+    # --- IP Geolocation ----------------------------------------
     _PRIVATE_RE = re.compile(r"^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)")
 
     def _geolocate_ip(self, ip: str) -> str:
@@ -151,7 +151,7 @@ class RavenApp(ctk.CTk):
             return result
 
         # Return placeholder immediately; the real fetch happens in a thread
-        self._geo_cache[ip] = "Locating…"
+        self._geo_cache[ip] = "Locating..."
         threading.Thread(target=self._fetch_geo, args=(ip,), daemon=True).start()
         return self._geo_cache[ip]
 
@@ -167,7 +167,7 @@ class RavenApp(ctk.CTk):
                 city = data.get("city", "Unknown")
                 country = data.get("country", "Unknown")
                 isp = data.get("isp", "Unknown")
-                self._geo_cache[ip] = f"{city}, {country} — {isp}"
+                self._geo_cache[ip] = f"{city}, {country} - {isp}"
             else:
                 self._geo_cache[ip] = "Lookup failed"
         except Exception:
@@ -228,7 +228,7 @@ class RavenApp(ctk.CTk):
         left_frame = ctk.CTkFrame(self.top_header, fg_color="transparent")
         left_frame.grid(row=0, column=0, sticky="w", padx=20, pady=12)
         
-        self.pulse_label = ctk.CTkLabel(left_frame, text="●", font=ctk.CTkFont(size=14, weight="bold"), text_color=ACCENT)
+        self.pulse_label = ctk.CTkLabel(left_frame, text="*", font=ctk.CTkFont(size=14, weight="bold"), text_color=ACCENT)
         self.pulse_label.pack(side="left", padx=(0, 8))
         
         ctk.CTkLabel(left_frame, text="RAVEN 2.0 LIVE", font=ctk.CTkFont(size=14, weight="bold"), text_color=TEXT_PRIMARY).pack(side="left")
@@ -260,7 +260,7 @@ class RavenApp(ctk.CTk):
             self.scanline.place(relx=0, rely=self._scanline_y, relwidth=1.0)
         self.after(50, self._animate_scanline)
 
-    # ── Sidebar ────────────────────────────────────────────
+    # --- Sidebar -----------------------------------------------
     def _build_sidebar(self):
         sb = ctk.CTkFrame(self, width=230, corner_radius=0, fg_color=SIDEBAR_BG, border_width=0)
         sb.grid(row=1, column=0, rowspan=2, sticky="nsew")
@@ -268,7 +268,7 @@ class RavenApp(ctk.CTk):
         sb.grid_rowconfigure(9, weight=1)
 
         # Logo
-        ctk.CTkLabel(sb, text="◈ RAVEN", font=ctk.CTkFont(size=28, weight="bold"), text_color=ACCENT).grid(row=0, column=0, padx=24, pady=(30, 0), sticky="w")
+        ctk.CTkLabel(sb, text="RAVEN", font=ctk.CTkFont(size=28, weight="bold"), text_color=ACCENT).grid(row=0, column=0, padx=24, pady=(30, 0), sticky="w")
         ctk.CTkLabel(sb, text="  v2.0 Autonomous Defense", font=ctk.CTkFont(size=11), text_color=TEXT_MUTED).grid(row=1, column=0, padx=24, pady=(0, 30), sticky="w")
 
         # Separator
@@ -277,10 +277,10 @@ class RavenApp(ctk.CTk):
         # Navigation buttons
         btn_cfg = dict(font=ctk.CTkFont(size=14), height=42, anchor="w", corner_radius=8)
 
-        self.nav_dashboard = ctk.CTkButton(sb, text="  ◉  Dashboard", fg_color=BG_ELEVATED, text_color=ACCENT, hover_color=BG_CARD, command=self._show_dashboard, **btn_cfg)
+        self.nav_dashboard = ctk.CTkButton(sb, text="  Dashboard", fg_color=BG_ELEVATED, text_color=ACCENT, hover_color=BG_CARD, command=self._show_dashboard, **btn_cfg)
         self.nav_dashboard.grid(row=3, column=0, padx=12, pady=3, sticky="ew")
 
-        self.nav_threats = ctk.CTkButton(sb, text="  ⚡  Threat Feed", fg_color="transparent", text_color=TEXT_SECONDARY, hover_color=BG_CARD, command=self._show_threats, **btn_cfg)
+        self.nav_threats = ctk.CTkButton(sb, text="  Threat Feed", fg_color="transparent", text_color=TEXT_SECONDARY, hover_color=BG_CARD, command=self._show_threats, **btn_cfg)
         self.nav_threats.grid(row=4, column=0, padx=12, pady=3, sticky="ew")
 
         self.threat_badge_lbl = ctk.CTkLabel(self.nav_threats, text="", width=24, height=18, font=ctk.CTkFont(size=10, weight="bold"), fg_color=CRITICAL, text_color="#000", corner_radius=8)
@@ -288,27 +288,27 @@ class RavenApp(ctk.CTk):
         self.threat_badge_lbl.place_forget()
         self.threat_badge_lbl.bind("<Button-1>", lambda e: self._show_threats())
 
-        self.nav_audit = ctk.CTkButton(sb, text="  ☰  Audit Results", fg_color="transparent", text_color=TEXT_SECONDARY, hover_color=BG_CARD, command=self._show_audit, **btn_cfg)
+        self.nav_audit = ctk.CTkButton(sb, text="  Audit Results", fg_color="transparent", text_color=TEXT_SECONDARY, hover_color=BG_CARD, command=self._show_audit, **btn_cfg)
         self.nav_audit.grid(row=5, column=0, padx=12, pady=3, sticky="ew")
 
-        self.nav_analytics = ctk.CTkButton(sb, text="  📊  Analytics", fg_color="transparent", text_color=TEXT_SECONDARY, hover_color=BG_CARD, command=self._show_analytics, **btn_cfg)
+        self.nav_analytics = ctk.CTkButton(sb, text="  Analytics", fg_color="transparent", text_color=TEXT_SECONDARY, hover_color=BG_CARD, command=self._show_analytics, **btn_cfg)
         self.nav_analytics.grid(row=6, column=0, padx=12, pady=3, sticky="ew")
 
-        self.nav_settings = ctk.CTkButton(sb, text="  ⚙  Settings", fg_color="transparent", text_color=TEXT_SECONDARY, hover_color=BG_CARD, command=self._show_settings, **btn_cfg)
+        self.nav_settings = ctk.CTkButton(sb, text="  Settings", fg_color="transparent", text_color=TEXT_SECONDARY, hover_color=BG_CARD, command=self._show_settings, **btn_cfg)
         self.nav_settings.grid(row=7, column=0, padx=12, pady=3, sticky="ew")
 
         # Separator
         ctk.CTkFrame(sb, height=1, fg_color=BORDER_CLR).grid(row=8, column=0, sticky="ew", padx=16, pady=15)
 
         # Action buttons
-        self.btn_scan = ctk.CTkButton(sb, text="  🛡  Run Full Scan", font=ctk.CTkFont(size=13, weight="bold"), height=40, fg_color=ACCENT, text_color="#000", hover_color=ACCENT_DIM, corner_radius=8, command=self._run_scan)
+        self.btn_scan = ctk.CTkButton(sb, text="  Run Full Scan", font=ctk.CTkFont(size=13, weight="bold"), height=40, fg_color=ACCENT, text_color="#000", hover_color=ACCENT_DIM, corner_radius=8, command=self._run_scan)
         self.btn_scan.grid(row=8, column=0, padx=16, pady=4, sticky="ew")
 
-        self.btn_report = ctk.CTkButton(sb, text="  📄  Export PDF", font=ctk.CTkFont(size=13), height=38, fg_color="transparent", border_width=1, border_color=BORDER_CLR, text_color=TEXT_PRIMARY, hover_color=BG_CARD, corner_radius=8, command=self._generate_report)
+        self.btn_report = ctk.CTkButton(sb, text="  Export PDF", font=ctk.CTkFont(size=13), height=38, fg_color="transparent", border_width=1, border_color=BORDER_CLR, text_color=TEXT_PRIMARY, hover_color=BG_CARD, corner_radius=8, command=self._generate_report)
         self.btn_report.grid(row=9, column=0, padx=16, pady=4, sticky="new")
 
         # Bottom section
-        self.btn_clear = ctk.CTkButton(sb, text="  ✕  Clear Database", font=ctk.CTkFont(size=12), height=36, fg_color="transparent", border_width=1, border_color=TEXT_MUTED, text_color=TEXT_MUTED, hover_color="#1A0A10", corner_radius=8, command=self._clear_db)
+        self.btn_clear = ctk.CTkButton(sb, text="  Clear Database", font=ctk.CTkFont(size=12), height=36, fg_color="transparent", border_width=1, border_color=TEXT_MUTED, text_color=TEXT_MUTED, hover_color="#1A0A10", corner_radius=8, command=self._clear_db)
         self.btn_clear.grid(row=10, column=0, padx=16, pady=(10, 20), sticky="sew")
 
         self._nav_buttons = {
@@ -327,7 +327,7 @@ class RavenApp(ctk.CTk):
                 btn.configure(fg_color="transparent", text_color=TEXT_SECONDARY)
         self._current_tab = name
 
-    # ── Main Content Area ──────────────────────────────────
+    # --- Main Content Area --------------------------------------
     def _build_main_area(self):
         self.content = ctk.CTkFrame(self, fg_color=BG_DARK, corner_radius=0)
         self.content.grid(row=1, column=1, sticky="nsew", padx=0, pady=0)
@@ -342,13 +342,13 @@ class RavenApp(ctk.CTk):
             if w != getattr(self, 'scanline', None):
                 w.destroy()
 
-    # ── Status Bar ─────────────────────────────────────────
+    # --- Status Bar ---------------------------------------------
     def _build_status_bar(self):
         self.statusbar = ctk.CTkFrame(self, height=28, corner_radius=0, fg_color=BG_SURFACE, border_width=0)
         self.statusbar.grid(row=2, column=1, sticky="ew")
         self.statusbar.grid_columnconfigure(1, weight=1)
 
-        self.status_left = ctk.CTkLabel(self.statusbar, text="● System Online", font=ctk.CTkFont(size=11), text_color=SAFE_CLR)
+        self.status_left = ctk.CTkLabel(self.statusbar, text="System Online", font=ctk.CTkFont(size=11), text_color=SAFE_CLR)
         self.status_left.grid(row=0, column=0, padx=12, pady=3, sticky="w")
 
         self.status_right = ctk.CTkLabel(self.statusbar, text="Last refresh: --", font=ctk.CTkFont(size=11), text_color=TEXT_MUTED)
@@ -363,12 +363,12 @@ class RavenApp(ctk.CTk):
         uptime = datetime.now() - self.start_time
         mins = int(uptime.total_seconds() // 60)
         secs = int(uptime.total_seconds() % 60)
-        self.status_left.configure(text=f"● Online — Uptime {mins}m {secs}s")
+        self.status_left.configure(text=f"Online - Uptime {mins}m {secs}s")
         tg = "Telegram: Connected" if is_telegram_connected() else "Telegram: Offline"
         tg_clr = SAFE_CLR if is_telegram_connected() else TEXT_MUTED
         self.status_tg.configure(text=tg, text_color=tg_clr)
 
-    # ── Dashboard Tab ──────────────────────────────────────
+    # --- Dashboard Tab -----------------------------------------
     def _show_dashboard(self):
         self._set_active_nav("dashboard")
         self._clear_content()
@@ -419,7 +419,7 @@ class RavenApp(ctk.CTk):
         pf_header = ctk.CTkFrame(left_col, fg_color="transparent")
         pf_header.pack(fill="x", padx=10, pady=(15, 5))
         ctk.CTkLabel(pf_header, text="Recent Threats", font=ctk.CTkFont(size=16, weight="bold"), text_color=TEXT_PRIMARY).pack(side="left")
-        ctk.CTkButton(pf_header, text="View All →", font=ctk.CTkFont(size=12), width=80, height=28, fg_color="transparent", text_color=ACCENT, hover_color=BG_ELEVATED, command=self._show_threats).pack(side="right")
+        ctk.CTkButton(pf_header, text="View All", font=ctk.CTkFont(size=12), width=80, height=28, fg_color="transparent", text_color=ACCENT, hover_color=BG_ELEVATED, command=self._show_threats).pack(side="right")
 
         self._dash_feed = ctk.CTkScrollableFrame(left_col, fg_color="transparent", scrollbar_button_color=BG_ELEVATED)
         self._dash_feed.pack(fill="both", expand=True, padx=0, pady=0)
@@ -461,9 +461,9 @@ class RavenApp(ctk.CTk):
         curr = float(value) if str(value).isdigit() else 0
         trend_str = ""
         if curr > prev:
-            trend_str = " ▲"
+            trend_str = " (Up)"
         elif curr < prev:
-            trend_str = " ▼"
+            trend_str = " (Down)"
 
         ctk.CTkLabel(card, text=title + trend_str, font=ctk.CTkFont(size=11, weight="bold"), text_color=TEXT_MUTED).grid(row=1, column=0, pady=(15, 0))
         lbl = ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=38, weight="bold"), text_color=color)
@@ -476,7 +476,7 @@ class RavenApp(ctk.CTk):
         if score > 50: return HIGH_CLR
         return CRITICAL
 
-    # ── Threat Feed Tab ────────────────────────────────────
+    # --- Threat Feed Tab ----------------------------------------
     def _show_threats(self):
         self._set_active_nav("threats")
         self._clear_content()
@@ -524,7 +524,7 @@ class RavenApp(ctk.CTk):
         sev_clr = SEVERITY_COLORS.get(t["severity"], TEXT_MUTED)
 
         # Severity dot
-        ctk.CTkLabel(row, text="●", font=ctk.CTkFont(size=10), text_color=sev_clr, width=20).pack(side="left", padx=(12, 4))
+        ctk.CTkLabel(row, text="*", font=ctk.CTkFont(size=10), text_color=sev_clr, width=20).pack(side="left", padx=(12, 4))
         ctk.CTkLabel(row, text=t["event_type"], font=ctk.CTkFont(size=13, weight="bold"), text_color=TEXT_PRIMARY).pack(side="left", padx=(0, 10))
         ctk.CTkLabel(row, text=t["source_ip"], font=ctk.CTkFont(size=12), text_color=TEXT_SECONDARY).pack(side="left")
         ctk.CTkLabel(row, text=t["severity"], font=ctk.CTkFont(size=11, weight="bold"), text_color=sev_clr).pack(side="right", padx=12)
@@ -552,7 +552,7 @@ class RavenApp(ctk.CTk):
         except Exception:
             rel_time = "Unknown"
 
-        ctk.CTkLabel(row, text="●", font=ctk.CTkFont(size=10), text_color=HIGH_CLR, width=20).pack(side="left", padx=(12, 4))
+        ctk.CTkLabel(row, text="*", font=ctk.CTkFont(size=10), text_color=HIGH_CLR, width=20).pack(side="left", padx=(12, 4))
         ctk.CTkLabel(row, text=e["attacker_ip"], font=ctk.CTkFont(size=13, weight="bold"), text_color=TEXT_PRIMARY).pack(side="left", padx=(0, 10))
         ctk.CTkLabel(row, text=f"Port {e['port']}", font=ctk.CTkFont(size=12), text_color=TEXT_SECONDARY).pack(side="left")
         ctk.CTkLabel(row, text=rel_time, font=ctk.CTkFont(size=11), text_color=TEXT_MUTED).pack(side="right", padx=(0, 12))
@@ -599,13 +599,13 @@ class RavenApp(ctk.CTk):
 
         # Geo location
         geo_text = self._geolocate_ip(t["source_ip"])
-        ctk.CTkLabel(card, text=f"📍 {geo_text}", font=ctk.CTkFont(size=12), text_color=TEXT_SECONDARY).pack(anchor="w", padx=16, pady=(0, 4))
+        ctk.CTkLabel(card, text=f"Location: {geo_text}", font=ctk.CTkFont(size=12), text_color=TEXT_SECONDARY).pack(anchor="w", padx=16, pady=(0, 4))
 
         # AI Analysis
         if t.get("ai_analysis"):
             ai_frame = ctk.CTkFrame(card, fg_color=BG_ELEVATED, corner_radius=6)
             ai_frame.pack(fill="x", padx=16, pady=(4, 4))
-            ctk.CTkLabel(ai_frame, text=f"🤖  {t['ai_analysis']}", font=ctk.CTkFont(size=12), text_color=TEXT_SECONDARY, wraplength=700, justify="left").pack(padx=14, pady=10, anchor="w")
+            ctk.CTkLabel(ai_frame, text=f"AI Analysis: {t['ai_analysis']}", font=ctk.CTkFont(size=12), text_color=TEXT_SECONDARY, wraplength=700, justify="left").pack(padx=14, pady=10, anchor="w")
         else:
             # Add bottom padding if no AI analysis
             ctk.CTkFrame(card, fg_color="transparent", height=4).pack()
@@ -616,7 +616,7 @@ class RavenApp(ctk.CTk):
             mitre_frame = ctk.CTkFrame(card, fg_color="transparent")
             mitre_frame.pack(fill="x", padx=16, pady=(0, 14))
             
-            m_text = f"🛡 MITRE: {mitre['tactic_name']} ({mitre['tactic_id']}) ➔ {mitre['technique_name']} "
+            m_text = f"MITRE: {mitre['tactic_name']} ({mitre['tactic_id']}) -> {mitre['technique_name']} "
             ctk.CTkLabel(mitre_frame, text=m_text, font=ctk.CTkFont(size=11, weight="bold"), text_color="#7C3AED").pack(side="left")
             
             link_lbl = ctk.CTkLabel(mitre_frame, text=f"({mitre['technique_id']})", font=ctk.CTkFont(size=11, weight="bold", underline=True), text_color="#7C3AED", cursor="hand2")
@@ -627,7 +627,7 @@ class RavenApp(ctk.CTk):
         else:
             ctk.CTkFrame(card, fg_color="transparent", height=10).pack()
 
-    # ── Audit Tab ──────────────────────────────────────────
+    # --- Audit Tab ----------------------------------------------
     def _show_audit(self):
         self._set_active_nav("audit")
         self._clear_content()
@@ -655,7 +655,7 @@ class RavenApp(ctk.CTk):
 
         status = a["status"]
         status_clr = SAFE_CLR if status == "PASS" else CRITICAL
-        status_text = "✓ PASS" if status == "PASS" else "✕ FAIL"
+        status_text = "PASS" if status == "PASS" else "FAIL"
 
         ctk.CTkLabel(hdr, text=status_text, font=ctk.CTkFont(size=12, weight="bold"), text_color=status_clr).pack(side="left")
         ctk.CTkLabel(hdr, text=a["check_name"], font=ctk.CTkFont(size=14, weight="bold"), text_color=TEXT_PRIMARY).pack(side="left", padx=12)
@@ -663,7 +663,7 @@ class RavenApp(ctk.CTk):
 
         ctk.CTkLabel(card, text=a.get("detail", ""), font=ctk.CTkFont(size=12), text_color=TEXT_SECONDARY, wraplength=700, justify="left").pack(anchor="w", padx=16, pady=(0, 12))
 
-    # ── Analytics Tab ──────────────────────────────────────
+    # --- Analytics Tab ------------------------------------------
     def _fetch_hourly_threats(self):
         """Returns threat counts and worst severity per hour for the last 24h."""
         conn = self._db()
@@ -722,7 +722,7 @@ class RavenApp(ctk.CTk):
             "Low": LOW_CLR,
         }
 
-        # ── Chart 1: Threats per hour (bar) ───────────────
+        # --- Chart 1: Threats per hour (bar) ------------------------
         hour_labels, hour_counts, hour_worst = self._fetch_hourly_threats()
         bar_colors = [sev_mpl.get(w, LOW_CLR) for w in hour_worst]
 
@@ -742,7 +742,7 @@ class RavenApp(ctk.CTk):
         canvas1.draw()
         canvas1.get_tk_widget().pack(fill="x", padx=10, pady=(10, 5))
 
-        # ── Chart 2: Severity donut ───────────────────────
+        # --- Chart 2: Severity donut -------------------------------
         _, _, _, sev_counts, _ = self._fetch_stats()
         labels_pie = []
         sizes_pie = []
@@ -785,7 +785,7 @@ class RavenApp(ctk.CTk):
         canvas2.draw()
         canvas2.get_tk_widget().pack(fill="x", padx=10, pady=5)
 
-        # ── Chart 3: Score trend (line) ───────────────────
+        # --- Chart 3: Score trend (line) ---------------------------
         fig3, ax3 = plt.subplots(figsize=(8, 2.6), dpi=100)
         fig3.patch.set_facecolor(bg)
         ax3.set_facecolor(card_bg)
@@ -815,7 +815,7 @@ class RavenApp(ctk.CTk):
         plt.close(fig2)
         plt.close(fig3)
 
-    # ── Actions ────────────────────────────────────────────
+    # --- Actions -----------------------------------------------
     def _get_next_report_time(self):
         from config import REPORT_SCHEDULE
         if REPORT_SCHEDULE == "off":
@@ -896,7 +896,7 @@ class RavenApp(ctk.CTk):
 
         next_report = self._get_next_report_time()
         ctk.CTkLabel(footer, text=f"Next scheduled report: {next_report}", font=ctk.CTkFont(size=12), text_color=TEXT_SECONDARY).pack(pady=(0, 5))
-        ctk.CTkLabel(footer, text="⚠️ Changing settings requires a system restart to take effect.", font=ctk.CTkFont(size=12), text_color=HIGH_CLR).pack(pady=(0, 10))
+        ctk.CTkLabel(footer, text="Changing settings requires a system restart to take effect.", font=ctk.CTkFont(size=12), text_color=HIGH_CLR).pack(pady=(0, 10))
 
         self.btn_save_settings = ctk.CTkButton(
             footer, text="Save Settings",
@@ -953,7 +953,7 @@ class RavenApp(ctk.CTk):
             y = self.winfo_screenheight() - toast_h - 60
             toast.geometry(f"{toast_w}x{toast_h}+{x}+{y}")
 
-            ctk.CTkLabel(toast, text="✓ Settings Saved", font=ctk.CTkFont(size=14, weight="bold"), text_color="#00F58A").pack(expand=True, fill="both", padx=10, pady=5)
+            ctk.CTkLabel(toast, text="Settings Saved", font=ctk.CTkFont(size=14, weight="bold"), text_color="#00F58A").pack(expand=True, fill="both", padx=10, pady=5)
             self.after(2000, toast.destroy)
 
         except Exception as e:
@@ -1018,20 +1018,20 @@ class RavenApp(ctk.CTk):
 
     def _run_scan(self):
         def worker():
-            self.btn_scan.configure(state="disabled", text="  ⏳  Scanning...")
+            self.btn_scan.configure(state="disabled", text="  Scanning...")
             try:
                 log_parser.parse_logs()
                 auditor.run_audit()
             except Exception:
                 pass
             finally:
-                self.btn_scan.configure(state="normal", text="  🛡  Run Full Scan")
+                self.btn_scan.configure(state="normal", text="  Run Full Scan")
                 self.after(100, self._refresh_current_tab)
         threading.Thread(target=worker, daemon=True).start()
 
     def _generate_report(self):
         def worker():
-            self.btn_report.configure(state="disabled", text="  ⏳  Generating...")
+            self.btn_report.configure(state="disabled", text="  Generating...")
             try:
                 out_dir = Path(__file__).parent / "reports"
                 out_dir.mkdir(exist_ok=True)
@@ -1044,7 +1044,7 @@ class RavenApp(ctk.CTk):
             except Exception as e:
                 print(f"Report error: {e}")
             finally:
-                self.btn_report.configure(state="normal", text="  📄  Export PDF")
+                self.btn_report.configure(state="normal", text="  Export PDF")
         threading.Thread(target=worker, daemon=True).start()
 
     def _clear_db(self):
@@ -1101,7 +1101,7 @@ class RavenApp(ctk.CTk):
             command=on_confirm
         ).pack(side="right", padx=10, expand=True)
 
-    # ── Refresh Logic ──────────────────────────────────────
+    # --- Refresh Logic ------------------------------------------
     def _refresh_current_tab(self):
         if self._current_tab == "dashboard":
             self._show_dashboard()
@@ -1115,7 +1115,7 @@ class RavenApp(ctk.CTk):
             self._show_settings()
 
     def _tick_refresh(self):
-        """Lightweight periodic check — only rebuilds UI if data changed."""
+        """Lightweight periodic check - only rebuilds UI if data changed."""
         try:
             total, alerts, score, sev, fails = self._fetch_stats()
             
@@ -1150,7 +1150,7 @@ class RavenApp(ctk.CTk):
         self.after(3000, self._tick_refresh)
 
 
-# ── Entry Point ────────────────────────────────────────────
+# --- Entry Point --------------------------------------------
 def run_app():
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("dark-blue")

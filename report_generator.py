@@ -7,8 +7,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.units import inch
 import mitre_mapper
-
-DB_PATH = Path(__file__).parent / "raven.db"
+import db_init
 
 def _header_footer(canvas_obj, doc):
     canvas_obj.saveState()
@@ -21,7 +20,7 @@ def _header_footer(canvas_obj, doc):
     canvas_obj.restoreState()
 
 def _fetch_data():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_init.DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     

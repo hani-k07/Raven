@@ -6,8 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from config import FIM_PATHS
 from analyzer import check_file_hash_reputation
-
-DB_PATH = Path(__file__).parent / "raven.db"
+import db_init
 
 # Default watched paths if FIM_PATHS env is not set
 DEFAULT_PATHS = {
@@ -40,7 +39,7 @@ def compute_hash(path: str) -> str | None:
 
 def init_baseline() -> None:
     """Initializes the FIM baseline for all watched paths."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_init.DB_PATH)
     cursor = conn.cursor()
 
     for path in WATCHED_PATHS:
@@ -59,7 +58,7 @@ def init_baseline() -> None:
 def check_integrity() -> list[dict]:
     """Checks current hashes against the baseline and updates it."""
     results = []
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_init.DB_PATH)
     cursor = conn.cursor()
 
     for path in WATCHED_PATHS:
@@ -108,7 +107,7 @@ def report_fim_change(change: dict) -> None:
     vt_info = change.get("vt_info", "")
     raw_log = f"File {status}: {path}{vt_info}"
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_init.DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO threats (timestamp, source_ip, event_type, raw_log, severity, ai_analysis, recommendation, alerted)
@@ -125,7 +124,7 @@ def report_fim_change(change: dict) -> None:
     ))
     conn.commit()
     conn.close()
-    print(f" [FIM] {status}: {path}")
+    print(f"[FIM] {status}: {path}")
 
 if __name__ == "__main__":
     print("Testing FIM...")

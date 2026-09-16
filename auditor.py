@@ -3,8 +3,7 @@ import subprocess
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-
-DB_PATH = Path(__file__).parent / "raven.db"
+import db_init
 
 def _run_cmd(cmd: str) -> str:
     """Runs a shell command and returns output or empty string."""
@@ -93,7 +92,7 @@ def run_audit() -> list[dict]:
         print(f"Unsupported OS for auditing: {os_name}")
         return results
         
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_init.DB_PATH)
     cursor = conn.cursor()
     timestamp = datetime.now().isoformat()
     

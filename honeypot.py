@@ -1,5 +1,5 @@
 """
-RAVEN 2.0 — Advanced Deception Grid (Honeypot Engine)
+RAVEN 2.0 - Advanced Deception Grid (Honeypot Engine)
 
 Protocol-aware honeypot system with banner responses, HTTP request parsing,
 multi-port scan detection, full session logging, and UDP DNS traps.
@@ -18,18 +18,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from config import HONEYPOT_PORTS
 from analyzer import analyze_threat
+from db_init import DB_PATH
 
-DB_PATH = Path(__file__).parent / "raven.db"
-
-# ── ANSI Colors (no colorama dependency) ──────────────────
-_RED = "\033[91m"
-_GRN = "\033[92m"
-_YEL = "\033[93m"
-_CYN = "\033[96m"
-_RST = "\033[0m"
-_BLD = "\033[1m"
-
-# ── Protocol Banners ──────────────────────────────────────
+# --- Protocol Banners --------------------------------------
 PROTOCOL_BANNERS = {
     22:   b"SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.6\r\n",
     23:   b"\xff\xfb\x01\xff\xfb\x03\xff\xfd\x18\xff\xfd\x1f",  # Telnet IAC negotiation
@@ -40,14 +31,14 @@ PROTOCOL_BANNERS = {
     3306: b"\x4a\x00\x00\x00\x0a\x38\x2e\x30\x2e\x33\x35\x00",  # MySQL 8.0.35 handshake stub
     5900: b"RFB 003.008\n",    # VNC protocol version
     6379: b"+PONG\r\n",        # Redis PING response
-    8080: None,   # HTTP alt — respond after reading
+    8080: None,   # HTTP alt - respond after reading
     2222: b"SSH-2.0-OpenSSH_7.4\r\n",  # Legacy SSH decoy
     2121: b"220 FTP archive ready (vsftpd 3.0.3)\r\n",
-    9200: None,   # Elasticsearch — respond to GET /
+    9200: None,   # Elasticsearch - respond to GET /
     9999: b"Welcome to RAVEN Decoy Service\r\n",
 }
 
-# ── HTTP Honeypot Constants ───────────────────────────────
+# --- HTTP Honeypot Constants -------------------------------
 HTTP_RESPONSE = (
     b"HTTP/1.1 200 OK\r\n"
     b"Server: Apache/2.4.41 (Ubuntu)\r\n"
@@ -72,13 +63,13 @@ SENSITIVE_PATHS = [
     "/server-status", "/debug", "/console", "/api/v1/token",
 ]
 
-# ── Multi-Port Scan Tracking ─────────────────────────────
+# --- Multi-Port Scan Tracking -------------------------------
 _ip_hits: dict[str, list[tuple[int, float]]] = {}  # ip -> [(port, timestamp), ...]
 _ip_lock = threading.Lock()
 _SCAN_WINDOW = 60.0    # seconds
 _SCAN_THRESHOLD = 3    # ports
 
-# ── Per-Port Concurrency Limiter ──────────────────────────
+# --- Per-Port Concurrency Limiter ---------------------------
 _port_semaphores: dict[int, threading.Semaphore] = {}
 _sem_lock = threading.Lock()
 
@@ -156,7 +147,7 @@ def _inject_portscan_alert(ip: str, ports: set[int]):
     n = len(ports)
     raw_log = f"Multi-port scan: {ip} probed {n} honeypot ports ({port_list}) within {_SCAN_WINDOW:.0f}s"
     ai_text = (
-        f"Attacker {ip} has probed {n} honeypot ports in under {_SCAN_WINDOW:.0f} seconds — "
+        f"Attacker {ip} has probed {n} honeypot ports in under {_SCAN_WINDOW:.0f} seconds - "
         f"active network mapping in progress. Ports hit: {port_list}."
     )
     recommendation = "Block IP at perimeter firewall. Flag for threat intel enrichment."
@@ -171,9 +162,9 @@ def _inject_portscan_alert(ip: str, ports: set[int]):
             (timestamp, ip, "HONEYPOT_PORTSCAN", raw_log, "Critical", ai_text, recommendation, 0),
         )
         conn.commit()
-        print(f"  {_RED}{_BLD}[PORTSCAN]{_RST} {ip} hit {n} ports — Critical alert injected")
+        print(f"  [PORTSCAN] {ip} hit {n} ports - Critical alert injected")
     except Exception as e:
-        print(f"  {_RED}[ERROR] Portscan DB write: {e}{_RST}")
+        print(f"  [ERROR] Portscan DB write: {e}")
     finally:
         if conn:
             conn.close()
@@ -236,7 +227,7 @@ def _read_full_session(client_socket: socket.socket, max_bytes: int = 4096) -> s
             if total >= max_bytes:
                 break
     except socket.timeout:
-        pass  # Timeout is expected — attacker may disconnect or be slow
+        pass  # Timeout is expected - attacker may disconnect or be slow
     except OSError:
         pass  # Socket closed
     return b"".join(chunks).decode("utf-8", errors="replace")
@@ -268,7 +259,7 @@ def _db_write(timestamp: str, ip: str, port: int, payload: str,
             (timestamp, ip, port, payload[:500]),
         )
 
-        # Try AI analysis in background — but don't block on failure
+        # Try AI analysis in background - but don't block on failure
         ai_analysis = f"Honeypot {event_type} event on port {port}. Attacker payload captured for analysis."
         recommendation = "Monitor attacker behavior. Add IP to watchlist."
 
@@ -297,13 +288,13 @@ def _db_write(timestamp: str, ip: str, port: int, payload: str,
         )
         conn.commit()
     except Exception as e:
-        print(f"  {_RED}[DB ERROR] {e}{_RST}")
+        print(f"  [DB ERROR] {e}")
     finally:
         if conn:
             conn.close()
 
 
-# ── TCP Connection Handler ────────────────────────────────
+# --- TCP Connection Handler --------------------------------
 
 def handle_connection(client_socket: socket.socket, client_address: tuple, port: int) -> None:
     """Handle an individual TCP honeypot connection with protocol-aware responses.
@@ -315,7 +306,7 @@ def handle_connection(client_socket: socket.socket, client_address: tuple, port:
     sem = _get_semaphore(port)
 
     if not sem.acquire(blocking=False):
-        # Too many concurrent connections on this port — drop silently
+        # Too many concurrent connections on this port - drop silently
         client_socket.close()
         return
 
@@ -344,7 +335,7 @@ def handle_connection(client_socket: socket.socket, client_address: tuple, port:
             fingerprint = f"HTTP {http['method']} {http['path']} | UA: {http['user_agent']}"
             if http["body"]:
                 fingerprint += f" | Body: {http['body'][:100]}"
-            raw_log = f"Port {port} — {fingerprint}"
+            raw_log = f"Port {port} - {fingerprint}"
 
         elif port == 9200:
             # Elasticsearch honeypot
@@ -353,24 +344,21 @@ def handle_connection(client_socket: socket.socket, client_address: tuple, port:
             except OSError:
                 pass
             http = _parse_http_request(payload)
-            raw_log = f"Port {port} — Elasticsearch probe: {http['method']} {http['path']}"
+            raw_log = f"Port {port} - Elasticsearch probe: {http['method']} {http['path']}"
 
         elif port in (22, 2222):
             # SSH: extract client version
             ssh_ver = _extract_ssh_version(payload)
-            raw_log = f"Port {port} SSH — Client: {ssh_ver} | Payload: {payload[:150]}"
+            raw_log = f"Port {port} SSH - Client: {ssh_ver} | Payload: {payload[:150]}"
 
         else:
-            raw_log = f"Port {port} hit — Payload ({len(payload)} bytes): {payload[:200]}"
+            raw_log = f"Port {port} hit - Payload ({len(payload)} bytes): {payload[:200]}"
 
         # Classify event
         event_type, severity = _classify_event(port, payload)
 
         # Log to console
-        sev_color = {
-            "Critical": _RED, "High": _YEL, "Medium": _CYN,
-        }.get(severity, _GRN)
-        print(f"  {sev_color}[{event_type:<20}]{_RST} {ip}:{attacker_port} -> port {port} | {severity}")
+        print(f"  [{event_type:<20}] {ip}:{attacker_port} -> port {port} | {severity}")
 
         # Write to database
         _db_write(timestamp, ip, port, payload, event_type, severity, raw_log)
@@ -379,7 +367,7 @@ def handle_connection(client_socket: socket.socket, client_address: tuple, port:
         _check_portscan(ip, port)
 
     except Exception as e:
-        print(f"  {_RED}[ERROR] Honeypot handler port {port}: {e}{_RST}")
+        print(f"  [ERROR] Honeypot handler port {port}: {e}")
     finally:
         sem.release()
         try:
@@ -388,7 +376,7 @@ def handle_connection(client_socket: socket.socket, client_address: tuple, port:
             pass
 
 
-# ── UDP DNS Honeypot ──────────────────────────────────────
+# --- UDP DNS Honeypot --------------------------------------
 
 def _extract_dns_qname(data: bytes) -> str:
     """Extract the queried domain name (QNAME) from a raw DNS packet.
@@ -423,9 +411,9 @@ def _start_udp_dns_honeypot(port: int = 53) -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("0.0.0.0", port))
-        print(f"  {_GRN}[DNS TRAP]{_RST} UDP honeypot listening on port {port}")
+        print(f"  [DNS TRAP] UDP honeypot listening on port {port}")
     except Exception as e:
-        print(f"  {_YEL}[DNS TRAP]{_RST} Failed to bind UDP port {port}: {e}")
+        print(f"  [DNS TRAP] Failed to bind UDP port {port}: {e}")
         return
 
     while True:
@@ -435,15 +423,15 @@ def _start_udp_dns_honeypot(port: int = 53) -> None:
             timestamp = datetime.now().isoformat()
             qname = _extract_dns_qname(data)
             payload = f"DNS query for '{qname}' ({len(data)} bytes)"
-            raw_log = f"Port 53/UDP — DNS lookup: {qname} from {ip}"
+            raw_log = f"Port 53/UDP - DNS lookup: {qname} from {ip}"
 
-            print(f"  {_CYN}[HONEYPOT_DNS        ]{_RST} {ip} → port 53/UDP | query: {qname}")
+            print(f"  [HONEYPOT_DNS        ] {ip} -> port 53/UDP | query: {qname}")
 
             _db_write(timestamp, ip, 53, payload, "HONEYPOT_DNS", "Medium", raw_log)
             _check_portscan(ip, 53)
 
         except Exception as e:
-            print(f"  {_RED}[DNS ERROR] {e}{_RST}")
+            print(f"  [DNS ERROR] {e}")
 
 
 # ── TCP Listener ──────────────────────────────────────────
@@ -466,7 +454,7 @@ def start_honeypot_listener(port: int) -> None:
             6379: "Redis", 8080: "HTTP-Alt", 2222: "SSH-Decoy",
             2121: "FTP-Decoy", 9200: "Elasticsearch", 9999: "Generic",
         }.get(port, "TCP")
-        print(f"  {_GRN}[LISTEN]{_RST} Honeypot {proto} on port {port}")
+        print(f"  [LISTEN] Honeypot {proto} on port {port}")
 
         while True:
             try:
@@ -481,11 +469,11 @@ def start_honeypot_listener(port: int) -> None:
                 break  # Socket closed during shutdown
 
     except PermissionError:
-        print(f"  {_YEL}[SKIP]{_RST} Port {port} requires elevated privileges — skipping")
+        print(f"  [SKIP] Port {port} requires elevated privileges - skipping")
     except OSError as e:
-        print(f"  {_RED}[FAIL]{_RST} Port {port}: {e}")
+        print(f"  [FAIL] Port {port}: {e}")
     except KeyboardInterrupt:
-        print(f"\n  {_YEL}[STOP]{_RST} Honeypot on port {port} shutting down")
+        print(f"\n  [STOP] Honeypot on port {port} shutting down")
     finally:
         try:
             server_socket.close()
@@ -502,10 +490,10 @@ def start_honeypot(ports: list[int]) -> None:
     if port 53 is in the list.
     """
     if not ports:
-        print(f"  {_YEL}[HONEYPOT]{_RST} No ports configured — deception grid offline")
+        print(f"  [HONEYPOT] No ports configured - deception grid offline")
         return
 
-    print(f"  {_GRN}[HONEYPOT]{_RST} Initializing deception grid on {len(ports)} ports...")
+    print(f"  [HONEYPOT] Initializing deception grid on {len(ports)} ports...")
 
     for port in ports:
         if port == 53:
@@ -515,11 +503,11 @@ def start_honeypot(ports: list[int]) -> None:
             thread = threading.Thread(target=start_honeypot_listener, args=(port,), daemon=True)
         thread.start()
 
-    print(f"  {_GRN}[HONEYPOT]{_RST} Deception grid ACTIVE — {len(ports)} traps deployed")
+    print(f"  [HONEYPOT] Deception grid ACTIVE - {len(ports)} traps deployed")
 
 
 if __name__ == "__main__":
-    print(f"\n{_BLD}RAVEN 2.0 — Standalone Honeypot Test{_RST}")
+    print("\nRAVEN 2.0 - Standalone Honeypot Test")
     print(f"Testing on ports 9999 (TCP) + 2222 (SSH decoy)\n")
     start_honeypot([9999, 2222])
 
@@ -528,4 +516,4 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print(f"\n{_YEL}Honeypot stopped.{_RST}")
+        print("\nHoneypot stopped.")

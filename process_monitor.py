@@ -4,9 +4,7 @@ import requests
 from datetime import datetime
 from pathlib import Path
 from analyzer import check_ip_reputation
-
-# Use the same DB path as others
-DB_PATH = Path(__file__).parent / "raven.db"
+import db_init
 
 def get_listening_ports() -> list[dict]:
     """Lists all listening TCP/UDP ports and their associated process names."""
@@ -35,13 +33,10 @@ def get_listening_ports() -> list[dict]:
 def check_for_new_ports() -> list[dict]:
     """Compares current listening ports against the baseline and reports anomalies."""
     current_ports = get_listening_ports()
-    print(f"[Debug] Current ports: {len(current_ports)}")
-    print(f"[Debug] DB Path: {DB_PATH}")
     anomalies = []
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_init.DB_PATH)
     cursor = conn.cursor()
-    print(f"[Debug] Baseline count: {cursor.execute('SELECT count(*) FROM process_baseline').fetchone()[0]}")
 
     for p in current_ports:
         port = p["port"]
@@ -112,7 +107,7 @@ def monitor_system() -> None:
 
     # 1. Check for new ports
     new_ports = check_for_new_ports()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_init.DB_PATH)
     cursor = conn.cursor()
 
     for anomaly in new_ports:
@@ -144,7 +139,7 @@ def monitor_system() -> None:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (timestamp, anomaly["ip"], anomaly["type"], raw_log, anomaly["severity"],
               ai_analysis["explanation"], ai_analysis["recommendation"], 0))
-        print(f"[ProcessMonitor] 🚨 {anomaly['severity']} - {anomaly['type']} to {anomaly['ip']}")
+        print(f"[ProcessMonitor] {anomaly['severity']} - {anomaly['type']} to {anomaly['ip']}")
 
     conn.commit()
     conn.close()
