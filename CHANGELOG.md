@@ -1,4 +1,5 @@
 ## [Unreleased]
+- fix(ci): resolve ModuleNotFoundError in tests and integrate security integrity check
 - feat(detection): expand Windows event coverage and add web server log parsing
 - feat(analysis): add VirusTotal file-hash and Shodan IP enrichment
 - feat(reporting): add scheduled daily/weekly automatic PDF report generation and delivery
