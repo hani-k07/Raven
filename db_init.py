@@ -3,11 +3,18 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "raven.db"
 
-def init_db():
-    """Initializes the SQLite database with required tables. Safe to call on every startup - does NOT drop existing data."""
+def get_connection():
+    """Returns a database connection with WAL mode enabled."""
     conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA journal_mode=WAL;") # Enable Write-Ahead Logging for better concurrency
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    """Initializes the SQLite database with required tables."""
+    conn = get_connection()
     cursor = conn.cursor()
+
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS threats (

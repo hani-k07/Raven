@@ -15,6 +15,7 @@ from config import (
     ALERT_EMAIL_FROM, ALERT_EMAIL_TO
 )
 import db_init
+from logger import log
 
 # Burst protection constants
 INDIVIDUAL_THRESHOLD = 3
@@ -140,87 +141,81 @@ def check_and_alert() -> int:
 
     alerts_sent = 0
     try:
-        conn = sqlite3.connect(db_init.DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        with db_init.get_connection() as conn:
+            cursor = conn.cursor()
 
-        cursor.execute("""
-            SELECT id, timestamp, source_ip, event_type, severity, ai_analysis, recommendation
-            FROM threats
-            WHERE alerted=0 AND severity IN ('High', 'Critical')
-        """)
+            cursor.execute("""
+                SELECT id, timestamp, source_ip, event_type, severity, ai_analysis, recommendation
+                FROM threats
+                WHERE alerted=0 AND severity IN ('High', 'Critical')
+            """)
 
-        threats = cursor.fetchall()
-        if not threats:
-            return 0
+            threats = cursor.fetchall()
+            if not threats:
+                return 0
 
-        if len(threats) <= INDIVIDUAL_THRESHOLD:
-            for threat in threats:
-                msg = _format_single(threat)
-                success = False
-                for name, sender in senders.items():
-                    if (name == "Telegram" and (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)) or \
-                       (name == "Slack" and SLACK_WEBHOOK_URL) or \
-                       (name == "Discord" and DISCORD_WEBHOOK_URL) or \
-                       (name == "Email" and SMTP_HOST):
-                        if sender(msg):
-                            success = True
-                            CHANNEL_STATUS[name]["available"] = True
-                            CHANNEL_STATUS[name]["fail_count"] = 0
-                        else:
-                            CHANNEL_STATUS[name]["available"] = False
-                            CHANNEL_STATUS[name]["fail_count"] += 1
-
-                if success:
-                    alerts_sent += 1
-                    # Auto-containment for high-severity alerts
-                    contained = containment.auto_contain({
-                        "severity": threat['severity'],
-                        "event_type": threat['event_type'],
-                        "source_ip": threat['source_ip']
-                    })
-                    if contained:
-                        print(f"  {_RED}[CONTAINMENT]{_RST} Automatically blocked {threat['source_ip']}")
-                cursor.execute("UPDATE threats SET alerted=1 WHERE id=?", (threat['id'],))
-        else:
-            digests = _format_digest(threats)
-            for digest in digests:
-                for name, sender in senders.items():
-                    if (name == "Telegram" and (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)) or \
-                       (name == "Slack" and SLACK_WEBHOOK_URL) or \
-                       (name == "Discord" and DISCORD_WEBHOOK_URL) or \
-                       (name == "Email" and SMTP_HOST):
-
-                        limit = TELEGRAM_LIMIT if name == "Telegram" else (DISCORD_LIMIT if name == "Discord" else 10000)
-                        chunks = _chunk_text(digest, limit)
-                        for chunk in chunks:
-                            if sender(chunk):
-                                alerts_sent += 1
+            if len(threats) <= INDIVIDUAL_THRESHOLD:
+                for threat in threats:
+                    msg = _format_single(threat)
+                    success = False
+                    for name, sender in senders.items():
+                        if (name == "Telegram" and (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)) or \
+                           (name == "Slack" and SLACK_WEBHOOK_URL) or \
+                           (name == "Discord" and DISCORD_WEBHOOK_URL) or \
+                           (name == "Email" and SMTP_HOST):
+                            if sender(msg):
+                                success = True
                                 CHANNEL_STATUS[name]["available"] = True
                                 CHANNEL_STATUS[name]["fail_count"] = 0
                             else:
                                 CHANNEL_STATUS[name]["available"] = False
                                 CHANNEL_STATUS[name]["fail_count"] += 1
 
-                # Auto-contain high-risk IPs from the burst
-                for threat in threats:
-                    containment.auto_contain({
-                        "severity": threat['severity'],
-                        "event_type": threat['event_type'],
-                        "source_ip": threat['source_ip']
-                    })
+                    if success:
+                        alerts_sent += 1
+                        # Auto-containment for high-severity alerts
+                        contained = containment.auto_contain({
+                            "severity": threat['severity'],
+                            "event_type": threat['event_type'],
+                            "source_ip": threat['source_ip']
+                        })
+                        if contained:
+                            log.info(f"[CONTAINMENT] Automatically blocked {threat['source_ip']}")
+                    cursor.execute("UPDATE threats SET alerted=1 WHERE id=?", (threat['id'],))
+            else:
+                digests = _format_digest(threats)
+                for digest in digests:
+                    for name, sender in senders.items():
+                        if (name == "Telegram" and (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)) or \
+                           (name == "Slack" and SLACK_WEBHOOK_URL) or \
+                           (name == "Discord" and DISCORD_WEBHOOK_URL) or \
+                           (name == "Email" and SMTP_HOST):
+
+                            limit = TELEGRAM_LIMIT if name == "Telegram" else (DISCORD_LIMIT if name == "Discord" else 10000)
+                            chunks = _chunk_text(digest, limit)
+                            for chunk in chunks:
+                                if sender(chunk):
+                                    alerts_sent += 1
+                                    CHANNEL_STATUS[name]["available"] = True
+                                    CHANNEL_STATUS[name]["fail_count"] = 0
+                                else:
+                                    CHANNEL_STATUS[name]["available"] = False
+                                    CHANNEL_STATUS[name]["fail_count"] += 1
+
+                    # Auto-contain high-risk IPs from the burst
+                    for threat in threats:
+                        containment.auto_contain({
+                            "severity": threat['severity'],
+                            "event_type": threat['event_type'],
+                            "source_ip": threat['source_ip']
+                        })
 
                 ids = [t['id'] for t in threats]
+                cursor.execute(f"UPDATE threats SET alerted=1 WHERE id IN ({','.join(['?']*len(ids))})", ids)
 
-            ids = [t['id'] for t in threats]
-            cursor.execute(f"UPDATE threats SET alerted=1 WHERE id IN ({','.join(['?']*len(ids))})", ids)
-
-        conn.commit()
+            conn.commit()
     except Exception as e:
-        print(f"[Alerter] Critical error: {e}")
-    finally:
-        if 'conn' in locals():
-            conn.close()
+        log.error(f"[Alerter] Critical error: {e}")
 
     return alerts_sent
 

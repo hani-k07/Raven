@@ -8,6 +8,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.units import inch
 import mitre_mapper
 import db_init
+from logger import log
 
 def _header_footer(canvas_obj, doc):
     canvas_obj.saveState()
@@ -20,17 +21,15 @@ def _header_footer(canvas_obj, doc):
     canvas_obj.restoreState()
 
 def _fetch_data():
-    conn = sqlite3.connect(db_init.DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT * FROM threats ORDER BY timestamp DESC")
-    threats = [dict(r) for r in cursor.fetchall()]
-    
-    cursor.execute("SELECT * FROM audit_results ORDER BY timestamp DESC")
-    audits = [dict(r) for r in cursor.fetchall()]
-    
-    conn.close()
+    with db_init.get_connection() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM threats ORDER BY timestamp DESC")
+        threats = [dict(r) for r in cursor.fetchall()]
+
+        cursor.execute("SELECT * FROM audit_results ORDER BY timestamp DESC")
+        audits = [dict(r) for r in cursor.fetchall()]
+
     return threats, audits
 
 def _get_security_score(threats, audits):
@@ -269,4 +268,4 @@ if __name__ == "__main__":
     out_dir = Path(__file__).parent / "reports"
     out_dir.mkdir(exist_ok=True)
     fpath = generate_report(out_dir)
-    print(f"Report generated at {fpath}")
+    log.info(f"Report generated at {fpath}")

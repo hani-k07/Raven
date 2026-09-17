@@ -7,6 +7,7 @@ from pathlib import Path
 from config import FIM_PATHS
 from analyzer import check_file_hash_reputation
 import db_init
+from logger import log
 
 # Default watched paths if FIM_PATHS env is not set
 DEFAULT_PATHS = {
@@ -41,65 +42,63 @@ def compute_hash(path: str) -> str | None:
 
 def init_baseline() -> None:
     """Initializes the FIM baseline for all watched paths."""
-    conn = sqlite3.connect(db_init.DB_PATH)
-    cursor = conn.cursor()
+    with db_init.get_connection() as conn:
+        cursor = conn.cursor()
 
-    for path in WATCHED_PATHS:
-        cursor.execute("SELECT hash FROM fim_baseline WHERE path = ?", (path,))
-        if not cursor.fetchone():
-            current_hash = compute_hash(path)
-            if current_hash:
-                cursor.execute(
-                    "INSERT INTO fim_baseline (path, hash, last_checked) VALUES (?, ?, ?)",
-                    (path, current_hash, datetime.now().isoformat())
-                )
+        for path in WATCHED_PATHS:
+            cursor.execute("SELECT hash FROM fim_baseline WHERE path = ?", (path,))
+            if not cursor.fetchone():
+                current_hash = compute_hash(path)
+                if current_hash:
+                    cursor.execute(
+                        "INSERT INTO fim_baseline (path, hash, last_checked) VALUES (?, ?, ?)",
+                        (path, current_hash, datetime.now().isoformat())
+                    )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
 
 def check_integrity() -> list[dict]:
     """Checks current hashes against the baseline and updates it."""
     results = []
-    conn = sqlite3.connect(db_init.DB_PATH)
-    cursor = conn.cursor()
+    with db_init.get_connection() as conn:
+        cursor = conn.cursor()
 
-    for path in WATCHED_PATHS:
-        cursor.execute("SELECT hash FROM fim_baseline WHERE path = ?", (path,))
-        row = cursor.fetchone()
-        old_hash = row[0] if row else None
-        new_hash = compute_hash(path)
+        for path in WATCHED_PATHS:
+            cursor.execute("SELECT hash FROM fim_baseline WHERE path = ?", (path,))
+            row = cursor.fetchone()
+            old_hash = row[0] if row else None
+            new_hash = compute_hash(path)
 
-        status = "OK"
-        if new_hash is None:
-            status = "MISSING" if old_hash else "OK"
-        elif old_hash is None:
-            status = "OK" # First time detection handled by init_baseline or dynamic add
-        elif old_hash != new_hash:
-            status = "CHANGED"
+            status = "OK"
+            if new_hash is None:
+                status = "MISSING" if old_hash else "OK"
+            elif old_hash is None:
+                status = "OK" # First time detection handled by init_baseline or dynamic add
+            elif old_hash != new_hash:
+                status = "CHANGED"
 
-        if status != "OK":
-            # Enrich with VirusTotal if changed
-            vt_info = ""
-            if status == "CHANGED" and new_hash:
-                vt = check_file_hash_reputation(new_hash)
-                if vt["verdict"] != "Unknown":
-                    vt_info = f" | VT Verdict: {vt['verdict']} ({vt['malicious']}/{vt['total_engines']})"
+            if status != "OK":
+                # Enrich with VirusTotal if changed
+                vt_info = ""
+                if status == "CHANGED" and new_hash:
+                    vt = check_file_hash_reputation(new_hash)
+                    if vt["verdict"] != "Unknown":
+                        vt_info = f" | VT Verdict: {vt['verdict']} ({vt['malicious']}/{vt['total_engines']})"
 
-            results.append({
-                "path": path,
-                "status": status,
-                "old_hash": old_hash,
-                "new_hash": new_hash,
-                "vt_info": vt_info
-            })
-            # Update baseline to avoid repeated alerts
-            cursor.execute(
-                "INSERT OR REPLACE INTO fim_baseline (path, hash, last_checked) VALUES (?, ?, ?)",
-                (path, new_hash, datetime.now().isoformat())
-            )
+                results.append({
+                    "path": path,
+                    "status": status,
+                    "old_hash": old_hash,
+                    "new_hash": new_hash,
+                    "vt_info": vt_info
+                })
+                # Update baseline to avoid repeated alerts
+                cursor.execute(
+                    "INSERT OR REPLACE INTO fim_baseline (path, hash, last_checked) VALUES (?, ?, ?)",
+                    (path, new_hash, datetime.now().isoformat())
+                )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
     return results
 
 def verify_integrity() -> None:
@@ -108,7 +107,7 @@ def verify_integrity() -> None:
     for change in changes:
         report_fim_change(change)
     if changes:
-        print(f"[FIM] Detected {len(changes)} integrity violations.")
+        log.info(f"[FIM] Detected {len(changes)} integrity violations.")
 
 def report_fim_change(change: dict) -> None:
     """Inserts a FIM change as a threat record."""
@@ -117,24 +116,23 @@ def report_fim_change(change: dict) -> None:
     vt_info = change.get("vt_info", "")
     raw_log = f"File {status}: {path}{vt_info}"
 
-    conn = sqlite3.connect(db_init.DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO threats (timestamp, source_ip, event_type, raw_log, severity, ai_analysis, recommendation, alerted)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        datetime.now().isoformat(),
-        "local",
-        "FILE_INTEGRITY_CHANGE",
-        raw_log,
-        "High",
-        f"File integrity violation detected on {path}. The file was {status.lower()}. {vt_info}",
-        "Verify the change against authorized change management records. Check for unauthorized persistence.",
-        False
-    ))
-    conn.commit()
-    conn.close()
-    print(f"[FIM] {status}: {path}")
+    with db_init.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO threats (timestamp, source_ip, event_type, raw_log, severity, ai_analysis, recommendation, alerted)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            datetime.now().isoformat(),
+            "local",
+            "FILE_INTEGRITY_CHANGE",
+            raw_log,
+            "High",
+            f"File integrity violation detected on {path}. The file was {status.lower()}. {vt_info}",
+            "Verify the change against authorized change management records. Check for unauthorized persistence.",
+            False
+        ))
+        conn.commit()
+    log.info(f"[FIM] {status}: {path}")
 
 if __name__ == "__main__":
     print("Testing FIM...")

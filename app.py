@@ -22,6 +22,8 @@ import auditor
 import report_generator
 import mitre_mapper
 import analyzer
+import db_init
+from logger import log
 
 DB_PATH = Path(__file__).parent / "raven.db"
 
@@ -90,53 +92,47 @@ class RavenApp(ctk.CTk):
 
     # --- Database -----------------------------------------------
     def _db(self):
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        return conn
+        return db_init.get_connection()
 
     def _fetch_stats(self):
-        conn = self._db()
-        c = conn.cursor()
-        c.execute("SELECT COUNT(*) as n FROM threats")
-        total = c.fetchone()["n"]
-        c.execute("SELECT COUNT(*) as n FROM threats WHERE alerted=0 AND severity IN ('High','Critical')")
-        alerts = c.fetchone()["n"]
-        c.execute("SELECT severity, COUNT(*) as n FROM threats GROUP BY severity")
-        sev = {r["severity"]: r["n"] for r in c.fetchall()}
-        c.execute("SELECT COUNT(*) as n FROM audit_results WHERE status='FAIL'")
-        fails = c.fetchone()["n"]
-        score = max(0, 100 - sev.get("Critical",0)*15 - sev.get("High",0)*8 - sev.get("Medium",0)*3 - sev.get("Low",0)*1 - fails*5)
-        conn.close()
+        with self._db() as conn:
+            c = conn.cursor()
+            c.execute("SELECT COUNT(*) as n FROM threats")
+            total = c.fetchone()["n"]
+            c.execute("SELECT COUNT(*) as n FROM threats WHERE alerted=0 AND severity IN ('High','Critical')")
+            alerts = c.fetchone()["n"]
+            c.execute("SELECT severity, COUNT(*) as n FROM threats GROUP BY severity")
+            sev = {r["severity"]: r["n"] for r in c.fetchall()}
+            c.execute("SELECT COUNT(*) as n FROM audit_results WHERE status='FAIL'")
+            fails = c.fetchone()["n"]
+            score = max(0, 100 - sev.get("Critical",0)*15 - sev.get("High",0)*8 - sev.get("Medium",0)*3 - sev.get("Low",0)*1 - fails*5)
         return total, alerts, score, sev, fails
 
     def _fetch_threats(self, severity_filter="All", limit=50):
-        conn = self._db()
-        c = conn.cursor()
-        if severity_filter == "All":
-            c.execute("SELECT * FROM threats ORDER BY timestamp DESC LIMIT ?", (limit,))
-        else:
-            c.execute(
-                "SELECT * FROM threats WHERE severity=? ORDER BY timestamp DESC LIMIT ?",
-                (severity_filter, limit),
-            )
-        rows = [dict(r) for r in c.fetchall()]
-        conn.close()
+        with self._db() as conn:
+            c = conn.cursor()
+            if severity_filter == "All":
+                c.execute("SELECT * FROM threats ORDER BY timestamp DESC LIMIT ?", (limit,))
+            else:
+                c.execute(
+                    "SELECT * FROM threats WHERE severity=? ORDER BY timestamp DESC LIMIT ?",
+                    (severity_filter, limit),
+                )
+            rows = [dict(r) for r in c.fetchall()]
         return rows
 
     def _fetch_audits(self):
-        conn = self._db()
-        c = conn.cursor()
-        c.execute("SELECT * FROM audit_results ORDER BY timestamp DESC")
-        rows = [dict(r) for r in c.fetchall()]
-        conn.close()
+        with self._db() as conn:
+            c = conn.cursor()
+            c.execute("SELECT * FROM audit_results ORDER BY timestamp DESC")
+            rows = [dict(r) for r in c.fetchall()]
         return rows
 
     def _fetch_honeypot_events(self, limit=10):
-        conn = self._db()
-        c = conn.cursor()
-        c.execute("SELECT * FROM honeypot_events ORDER BY timestamp DESC LIMIT ?", (limit,))
-        rows = [dict(r) for r in c.fetchall()]
-        conn.close()
+        with self._db() as conn:
+            c = conn.cursor()
+            c.execute("SELECT * FROM honeypot_events ORDER BY timestamp DESC LIMIT ?", (limit,))
+            rows = [dict(r) for r in c.fetchall()]
         return rows
 
     # --- IP Geolocation ----------------------------------------
@@ -994,16 +990,15 @@ class RavenApp(ctk.CTk):
 
         def on_confirm(allowlist=False):
             dialog.destroy()
-            conn = self._db()
-            cursor = conn.cursor()
-            cursor.execute("UPDATE threats SET false_positive=1 WHERE id=?", (threat_id,))
-            if allowlist:
-                cursor.execute(
-                    "INSERT OR REPLACE INTO ip_allowlist (ip, reason, added_at) VALUES (?, ?, ?)",
-                    (ip, "Marked as false positive from dashboard", datetime.now().isoformat())
-                )
-            conn.commit()
-            conn.close()
+            with self._db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE threats SET false_positive=1 WHERE id=?", (threat_id,))
+                if allowlist:
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO ip_allowlist (ip, reason, added_at) VALUES (?, ?, ?)",
+                        (ip, "Marked as false positive from dashboard", datetime.now().isoformat())
+                    )
+                conn.commit()
             self.after(100, self._refresh_current_tab)
 
         ctk.CTkButton(
@@ -1083,13 +1078,12 @@ class RavenApp(ctk.CTk):
         def on_confirm():
             dialog.destroy()
             try:
-                conn = self._db()
-                c = conn.cursor()
-                c.execute("DELETE FROM threats")
-                c.execute("DELETE FROM audit_results")
-                c.execute("DELETE FROM honeypot_events")
-                conn.commit()
-                conn.close()
+                with self._db() as conn:
+                    c = conn.cursor()
+                    c.execute("DELETE FROM threats")
+                    c.execute("DELETE FROM audit_results")
+                    c.execute("DELETE FROM honeypot_events")
+                    conn.commit()
                 self.after(100, self._refresh_current_tab)
             except Exception:
                 pass

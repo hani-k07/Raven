@@ -4,6 +4,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 import db_init
+from logger import log
 
 def _run_cmd(cmd: str) -> str:
     """Runs a shell command and returns output or empty string."""
@@ -83,27 +84,26 @@ def run_audit() -> list[dict]:
     """Runs OS-appropriate compliance checks and stores results."""
     os_name = platform.system()
     results = []
-    
+
     if os_name == "Linux":
         results = _audit_linux()
     elif os_name == "Windows":
         results = _audit_windows()
     else:
-        print(f"Unsupported OS for auditing: {os_name}")
+        log.warning(f"Unsupported OS for auditing: {os_name}")
         return results
-        
-    conn = sqlite3.connect(db_init.DB_PATH)
-    cursor = conn.cursor()
-    timestamp = datetime.now().isoformat()
-    
-    for r in results:
-        cursor.execute("""
-            INSERT INTO audit_results (check_name, status, detail, timestamp)
-            VALUES (?, ?, ?, ?)
-        """, (r['check_name'], r['status'], r['detail'], timestamp))
-        
-    conn.commit()
-    conn.close()
+
+    with db_init.get_connection() as conn:
+        cursor = conn.cursor()
+        timestamp = datetime.now().isoformat()
+
+        for r in results:
+            cursor.execute("""
+                INSERT INTO audit_results (check_name, status, detail, timestamp)
+                VALUES (?, ?, ?, ?)
+            """, (r['check_name'], r['status'], r['detail'], timestamp))
+
+        conn.commit()
     return results
 
 if __name__ == "__main__":

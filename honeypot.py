@@ -18,7 +18,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from config import HONEYPOT_PORTS
 from analyzer import analyze_threat
-from db_init import DB_PATH
+import db_init
+from logger import log
 
 # --- Protocol Banners --------------------------------------
 PROTOCOL_BANNERS = {
@@ -152,22 +153,18 @@ def _inject_portscan_alert(ip: str, ports: set[int]):
     )
     recommendation = "Block IP at perimeter firewall. Flag for threat intel enrichment."
 
-    conn = None
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO threats (timestamp, source_ip, event_type, raw_log, severity, ai_analysis, recommendation, alerted) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            (timestamp, ip, "HONEYPOT_PORTSCAN", raw_log, "Critical", ai_text, recommendation, 0),
-        )
-        conn.commit()
-        print(f"  [PORTSCAN] {ip} hit {n} ports - Critical alert injected")
+        with db_init.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO threats (timestamp, source_ip, event_type, raw_log, severity, ai_analysis, recommendation, alerted) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (timestamp, ip, "HONEYPOT_PORTSCAN", raw_log, "Critical", ai_text, recommendation, 0),
+            )
+            conn.commit()
+            log.info(f"  [PORTSCAN] {ip} hit {n} ports - Critical alert injected")
     except Exception as e:
-        print(f"  [ERROR] Portscan DB write: {e}")
-    finally:
-        if conn:
-            conn.close()
+        log.error(f"  [ERROR] Portscan DB write: {e}")
 
 
 def _parse_http_request(payload: str) -> dict:
@@ -235,12 +232,10 @@ def _read_full_session(client_socket: socket.socket, max_bytes: int = 4096) -> s
 
 def _is_ip_allowlisted(ip: str) -> bool:
     """Checks if an IP is in the allowlist."""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT 1 FROM ip_allowlist WHERE ip = ?", (ip,))
-    exists = cursor.fetchone() is not None
-    conn.close()
-    return exists
+    with db_init.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM ip_allowlist WHERE ip = ?", (ip,))
+        return cursor.fetchone() is not None
 
 def _db_write(timestamp: str, ip: str, port: int, payload: str,
               event_type: str, severity: str, raw_log: str):
@@ -248,50 +243,46 @@ def _db_write(timestamp: str, ip: str, port: int, payload: str,
 
     Uses AI analysis if available, falls back to local classification.
     """
-    conn = None
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
+        with db_init.get_connection() as conn:
+            cursor = conn.cursor()
 
-        # Honeypot events table
-        cursor.execute(
-            "INSERT INTO honeypot_events (timestamp, attacker_ip, port, payload) VALUES (?,?,?,?)",
-            (timestamp, ip, port, payload[:500]),
-        )
+            # Honeypot events table
+            cursor.execute(
+                "INSERT INTO honeypot_events (timestamp, attacker_ip, port, payload) VALUES (?,?,?,?)",
+                (timestamp, ip, port, payload[:500]),
+            )
 
-        # Try AI analysis in background - but don't block on failure
-        ai_analysis = f"Honeypot {event_type} event on port {port}. Attacker payload captured for analysis."
-        recommendation = "Monitor attacker behavior. Add IP to watchlist."
+            # Try AI analysis in background - but don't block on failure
+            ai_analysis = f"Honeypot {event_type} event on port {port}. Attacker payload captured for analysis."
+            recommendation = "Monitor attacker behavior. Add IP to watchlist."
 
-        try:
-            analysis = analyze_threat(event_type, raw_log[:300], ip)
-            if analysis.get("explanation"):
-                ai_analysis = analysis["explanation"]
-            if analysis.get("recommendation"):
-                recommendation = analysis["recommendation"]
-            # Use AI-determined severity if valid
-            ai_sev = analysis.get("severity", "")
-            if ai_sev in ("Low", "Medium", "High", "Critical"):
-                severity = ai_sev
-        except Exception:
-            pass  # Fall back to local classification
+            try:
+                analysis = analyze_threat(event_type, raw_log[:300], ip)
+                if analysis.get("explanation"):
+                    ai_analysis = analysis["explanation"]
+                if analysis.get("recommendation"):
+                    recommendation = analysis["recommendation"]
+                # Use AI-determined severity if valid
+                ai_sev = analysis.get("severity", "")
+                if ai_sev in ("Low", "Medium", "High", "Critical"):
+                    severity = ai_sev
+            except Exception:
+                pass  # Fall back to local classification
 
-        # Check allowlist
-        if _is_ip_allowlisted(ip):
-            severity = "Low"
-            ai_analysis = f"[ALLOWLISTED] {ai_analysis}"
+            # Check allowlist
+            if _is_ip_allowlisted(ip):
+                severity = "Low"
+                ai_analysis = f"[ALLOWLISTED] {ai_analysis}"
 
-        cursor.execute(
-            "INSERT INTO threats (timestamp, source_ip, event_type, raw_log, severity, ai_analysis, recommendation, alerted) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            (timestamp, ip, event_type, raw_log[:500], severity, ai_analysis, recommendation, 0),
-        )
-        conn.commit()
+            cursor.execute(
+                "INSERT INTO threats (timestamp, source_ip, event_type, raw_log, severity, ai_analysis, recommendation, alerted) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (timestamp, ip, event_type, raw_log[:500], severity, ai_analysis, recommendation, 0),
+            )
+            conn.commit()
     except Exception as e:
-        print(f"  [DB ERROR] {e}")
-    finally:
-        if conn:
-            conn.close()
+        log.error(f"  [DB ERROR] {e}")
 
 
 # --- TCP Connection Handler --------------------------------
@@ -358,7 +349,7 @@ def handle_connection(client_socket: socket.socket, client_address: tuple, port:
         event_type, severity = _classify_event(port, payload)
 
         # Log to console
-        print(f"  [{event_type:<20}] {ip}:{attacker_port} -> port {port} | {severity}")
+        log.info(f"  [{event_type:<20}] {ip}:{attacker_port} -> port {port} | {severity}")
 
         # Write to database
         _db_write(timestamp, ip, port, payload, event_type, severity, raw_log)
@@ -411,9 +402,9 @@ def _start_udp_dns_honeypot(port: int = 53) -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("0.0.0.0", port))
-        print(f"  [DNS TRAP] UDP honeypot listening on port {port}")
+        log.info(f"  [DNS TRAP] UDP honeypot listening on port {port}")
     except Exception as e:
-        print(f"  [DNS TRAP] Failed to bind UDP port {port}: {e}")
+        log.error(f"  [DNS TRAP] Failed to bind UDP port {port}: {e}")
         return
 
     while True:
@@ -425,13 +416,13 @@ def _start_udp_dns_honeypot(port: int = 53) -> None:
             payload = f"DNS query for '{qname}' ({len(data)} bytes)"
             raw_log = f"Port 53/UDP - DNS lookup: {qname} from {ip}"
 
-            print(f"  [HONEYPOT_DNS        ] {ip} -> port 53/UDP | query: {qname}")
+            log.info(f"  [HONEYPOT_DNS        ] {ip} -> port 53/UDP | query: {qname}")
 
             _db_write(timestamp, ip, 53, payload, "HONEYPOT_DNS", "Medium", raw_log)
             _check_portscan(ip, 53)
 
         except Exception as e:
-            print(f"  [DNS ERROR] {e}")
+            log.error(f"  [DNS ERROR] {e}")
 
 
 # ── TCP Listener ──────────────────────────────────────────
@@ -454,7 +445,7 @@ def start_honeypot_listener(port: int) -> None:
             6379: "Redis", 8080: "HTTP-Alt", 2222: "SSH-Decoy",
             2121: "FTP-Decoy", 9200: "Elasticsearch", 9999: "Generic",
         }.get(port, "TCP")
-        print(f"  [LISTEN] Honeypot {proto} on port {port}")
+        log.info(f"  [LISTEN] Honeypot {proto} on port {port}")
 
         while True:
             try:
@@ -469,11 +460,11 @@ def start_honeypot_listener(port: int) -> None:
                 break  # Socket closed during shutdown
 
     except PermissionError:
-        print(f"  [SKIP] Port {port} requires elevated privileges - skipping")
+        log.warning(f"  [SKIP] Port {port} requires elevated privileges - skipping")
     except OSError as e:
-        print(f"  [FAIL] Port {port}: {e}")
+        log.error(f"  [FAIL] Port {port}: {e}")
     except KeyboardInterrupt:
-        print(f"\n  [STOP] Honeypot on port {port} shutting down")
+        log.info(f"\n  [STOP] Honeypot on port {port} shutting down")
     finally:
         try:
             server_socket.close()
@@ -490,10 +481,10 @@ def start_honeypot(ports: list[int]) -> None:
     if port 53 is in the list.
     """
     if not ports:
-        print(f"  [HONEYPOT] No ports configured - deception grid offline")
+        log.warning(f"  [HONEYPOT] No ports configured - deception grid offline")
         return
 
-    print(f"  [HONEYPOT] Initializing deception grid on {len(ports)} ports...")
+    log.info(f"  [HONEYPOT] Initializing deception grid on {len(ports)} ports...")
 
     for port in ports:
         if port == 53:
@@ -503,7 +494,7 @@ def start_honeypot(ports: list[int]) -> None:
             thread = threading.Thread(target=start_honeypot_listener, args=(port,), daemon=True)
         thread.start()
 
-    print(f"  [HONEYPOT] Deception grid ACTIVE - {len(ports)} traps deployed")
+    log.info(f"  [HONEYPOT] Deception grid ACTIVE - {len(ports)} traps deployed")
 
 
 if __name__ == "__main__":
