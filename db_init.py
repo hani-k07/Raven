@@ -6,6 +6,7 @@ DB_PATH = Path(__file__).parent / "raven.db"
 def init_db():
     """Initializes the SQLite database with required tables. Safe to call on every startup - does NOT drop existing data."""
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA journal_mode=WAL;") # Enable Write-Ahead Logging for better concurrency
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -77,6 +78,7 @@ def init_db():
 def reset_db():
     """Drops and recreates all tables. FOR TESTING ONLY - destroys all data."""
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA journal_mode=WAL;") # Enable Write-Ahead Logging for better concurrency
     cursor = conn.cursor()
     cursor.execute("DROP TABLE IF EXISTS threats;")
     cursor.execute("DROP TABLE IF EXISTS audit_results;")

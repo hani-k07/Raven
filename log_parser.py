@@ -53,30 +53,30 @@ def _parse_linux_logs() -> list[dict]:
     if not log_path.exists():
         print(f"Log file not found: {log_path}")
         return []
-        
+
     patterns = {
         "Failed SSH": r"Failed password for .* from (\S+)",
         "Invalid user": r"Invalid user .* from (\S+)",
         "Root login refused": r"ROOT LOGIN REFUSED from (\S+)"
     }
-    
+
     processed = 0
     threats_found = []
-    
+
     try:
-        with open(log_path, 'r') as f:
-            lines = f.readlines()
-            for line in lines[-1000:]:
+        # Fixed: Use explicit encoding and avoid readlines() to prevent OOM on large logs
+        with open(log_path, 'r', encoding="utf-8", errors="replace") as f:
+            from collections import deque
+            lines = deque(f, maxlen=1000)
+            for line in lines:
                 if processed >= 50:
                     break
-                    
                 for event_type, pattern in patterns.items():
                     match = re.search(pattern, line)
                     if match:
                         source_ip = match.group(1)
                         analysis = analyze_threat(event_type, line.strip(), source_ip)
                         timestamp = datetime.now().isoformat()
-                        
                         _insert_threat(timestamp, source_ip, event_type, line.strip(), analysis)
                         threats_found.append({
                             "event_type": event_type,
@@ -88,32 +88,32 @@ def _parse_linux_logs() -> list[dict]:
                         break
     except Exception as e:
         print(f"Error reading Linux logs: {e}")
-        
+
     return threats_found
 
 def _parse_windows_logs() -> list[dict]:
     """Parses Windows Security Event Log using win32evtlog."""
     threats_found = []
     processed = 0
-    
+
     try:
         import win32evtlog
         import win32evtlogutil
-        
+
         server = 'localhost'
         logtype = 'Security'
-        
+
         hand = win32evtlog.OpenEventLog(server, logtype)
         flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
         total = win32evtlog.GetNumberOfEventLogRecords(hand)
-        
+
         events = win32evtlog.ReadEventLog(hand, flags, 0)
-        
+
         while events and processed < 50:
             for event in events:
                 if processed >= 50:
                     break
-                    
+
                 if event.EventID == 4625:
                     data = event.StringInserts
                     source_ip = data[19] if data and len(data) > 19 else "Unknown"
@@ -137,26 +137,26 @@ def _parse_windows_logs() -> list[dict]:
                 else:
                     continue
 
-                    analysis = analyze_threat(event_type, raw_log, source_ip)
-                    timestamp = event.TimeGenerated.Format() if event.TimeGenerated else datetime.now().isoformat()
-                    
-                    _insert_threat(timestamp, source_ip, event_type, raw_log, analysis)
-                    threats_found.append({
-                        "event_type": event_type,
-                        "source_ip": source_ip,
-                        "raw_log": raw_log,
-                        "analysis": analysis
-                    })
-                    processed += 1
-                    
+                analysis = analyze_threat(event_type, raw_log, source_ip)
+                timestamp = event.TimeGenerated.Format() if event.TimeGenerated else datetime.now().isoformat()
+
+                _insert_threat(timestamp, source_ip, event_type, raw_log, analysis)
+                threats_found.append({
+                    "event_type": event_type,
+                    "source_ip": source_ip,
+                    "raw_log": raw_log,
+                    "analysis": analysis
+                })
+                processed += 1
+
             if processed < 50:
                 events = win32evtlog.ReadEventLog(hand, flags, 0)
-                
+
     except ImportError:
         print("pywin32 is not installed. Required for Windows event log parsing.")
     except Exception as e:
         print(f"Error reading Windows logs: {e}")
-        
+
     return threats_found
 
 def _parse_web_server_logs(log_path: str) -> list[dict]:
@@ -165,17 +165,16 @@ def _parse_web_server_logs(log_path: str) -> list[dict]:
     if not path.exists():
         return []
 
-    # Combined Log Format: %h %l %u %t "%r" %>s %b "%{Referer}i" "%{User-Agent}i"
-    # Example: 127.0.0.1 - - [10/Sep/2026:10:00:00 +0000] "GET /admin HTTP/1.1" 404 123 "-" "Mozilla/5.0"
     pattern = r'^(\S+) \S+ \S+ \[(.*?)\] "(.*?) (.*?) .*?" (\d{3}) \d+ ".*?" "(.*?)"'
-
     threats_found = []
     processed = 0
 
     try:
-        with open(path, 'r') as f:
-            lines = f.readlines()
-            for line in lines[-1000:]:
+        # Fixed: Use explicit encoding and avoid readlines() to prevent OOM on large logs
+        with open(path, 'r', encoding="utf-8", errors="replace") as f:
+            from collections import deque
+            lines = deque(f, maxlen=1000)
+            for line in lines:
                 if processed >= 50:
                     break
 
@@ -188,7 +187,6 @@ def _parse_web_server_logs(log_path: str) -> list[dict]:
                     if any(p in path_req.lower() for p in honeypot.SENSITIVE_PATHS):
                         is_suspicious = True
                     elif status_int >= 400:
-                        # For simplicity, flag as suspicious if 4xx/5xx
                         is_suspicious = True
 
                     if is_suspicious:

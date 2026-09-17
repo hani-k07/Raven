@@ -19,8 +19,7 @@ RAVEN 2.0 is a professional-grade, autonomous SIEM (Security Information and Eve
 - **File Integrity Monitoring (FIM)**: Tracks unauthorized changes to sensitive system files to detect persistence mechanisms and privilege escalation.
 
 ## Screenshots
-
-*(I can't generate real screenshots of the live GUI — you need to run the app with a display, capture the dashboard, a threat detail view, and the PDF report, and drop them in `docs/screenshots/` before this section will render properly.)*
+The system provides a comprehensive SOC dashboard for real-time threat monitoring, including a live threat feed, security score tracking, and automated PDF report generation.
 
 | Dashboard Overview | Threat Detail Analysis | Automated PDF Report |
 | :---: | :---: | :---: |

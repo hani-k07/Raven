@@ -1,6 +1,7 @@
 import os
 import re
 import sqlite3
+from collections import OrderedDict
 import threading
 import subprocess
 import requests
@@ -63,9 +64,10 @@ class RavenApp(ctk.CTk):
         self._last_threat_count = -1
         self._current_tab = "dashboard"
         self._filter_severity = "All"
-        self._geo_cache = {}
-        self._reputation_cache = {}
+        self._geo_cache = OrderedDict()
+        self._reputation_cache = OrderedDict()
         self._score_history = []
+
         self._prev_stats = {}
         self._scanline_y = 0.0
 
@@ -140,6 +142,12 @@ class RavenApp(ctk.CTk):
     # --- IP Geolocation ----------------------------------------
     _PRIVATE_RE = re.compile(r"^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)")
 
+    def _update_cache(self, cache: OrderedDict, key: str, value: str, max_size=1000):
+        cache[key] = value
+        cache.move_to_end(key)
+        if len(cache) > max_size:
+            cache.popitem(last=False)
+
     def _geolocate_ip(self, ip: str) -> str:
         """Returns a geo string for the IP. Uses cache and detects private ranges."""
         if ip in self._geo_cache:
@@ -147,11 +155,11 @@ class RavenApp(ctk.CTk):
 
         if self._PRIVATE_RE.match(ip):
             result = "Private Network"
-            self._geo_cache[ip] = result
+            self._update_cache(self._geo_cache, ip, result)
             return result
 
         # Return placeholder immediately; the real fetch happens in a thread
-        self._geo_cache[ip] = "Locating..."
+        self._update_cache(self._geo_cache, ip, "Locating...")
         threading.Thread(target=self._fetch_geo, args=(ip,), daemon=True).start()
         return self._geo_cache[ip]
 
@@ -167,11 +175,11 @@ class RavenApp(ctk.CTk):
                 city = data.get("city", "Unknown")
                 country = data.get("country", "Unknown")
                 isp = data.get("isp", "Unknown")
-                self._geo_cache[ip] = f"{city}, {country} - {isp}"
+                self._update_cache(self._geo_cache, ip, f"{city}, {country} - {isp}")
             else:
-                self._geo_cache[ip] = "Lookup failed"
+                self._update_cache(self._geo_cache, ip, "Lookup failed")
         except Exception:
-            self._geo_cache[ip] = "Lookup failed"
+            self._update_cache(self._geo_cache, ip, "Lookup failed")
 
     def _get_reputation(self, ip: str, progress_bar, score_label):
         """Fetches reputation and Shodan data asynchronously and updates UI."""
@@ -181,7 +189,7 @@ class RavenApp(ctk.CTk):
 
         if self._PRIVATE_RE.match(ip):
             data = {"abuse_score": 0, "total_reports": 0, "shodan": {"open_ports": [], "org": "Unknown", "vulns": 0}}
-            self._reputation_cache[ip] = data
+            self._update_cache(self._reputation_cache, ip, data)
             self._update_reputation_ui(data, progress_bar, score_label)
             return
 
@@ -192,7 +200,7 @@ class RavenApp(ctk.CTk):
             shodan = analyzer.check_ip_shodan(ip)
 
             data = {**reputation, "shodan": shodan}
-            self._reputation_cache[ip] = data
+            self._update_cache(self._reputation_cache, ip, data)
             self.after(0, lambda: self._update_reputation_ui(data, progress_bar, score_label))
 
         threading.Thread(target=worker, daemon=True).start()
