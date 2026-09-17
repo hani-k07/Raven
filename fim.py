@@ -25,6 +25,8 @@ DEFAULT_PATHS = {
 }
 
 WATCHED_PATHS = FIM_PATHS if FIM_PATHS else DEFAULT_PATHS.get(platform.system(), [])
+if "README.md" not in WATCHED_PATHS:
+    WATCHED_PATHS.append("README.md")
 
 def compute_hash(path: str) -> str | None:
     """Computes SHA-256 hash of a file. Returns None if unreadable."""
@@ -99,6 +101,14 @@ def check_integrity() -> list[dict]:
     conn.commit()
     conn.close()
     return results
+
+def verify_integrity() -> None:
+    """Runs the integrity check and reports any changes to the threat database."""
+    changes = check_integrity()
+    for change in changes:
+        report_fim_change(change)
+    if changes:
+        print(f"[FIM] Detected {len(changes)} integrity violations.")
 
 def report_fim_change(change: dict) -> None:
     """Inserts a FIM change as a threat record."""

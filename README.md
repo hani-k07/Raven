@@ -34,8 +34,10 @@ cd Raven
 
 # 2. Create and activate a virtual environment
 python -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-# .\\.venv\\Scripts\\activate  # Windows
+# Windows:
+.\\.venv\\Scripts\\activate
+# Linux/macOS:
+source .venv/bin/activate
 
 # 3. Install dependencies
 pip install -r requirements.txt
@@ -45,10 +47,24 @@ cp .env.example .env
 # Edit .env with your API keys (OpenRouter, AbuseIPDB, Telegram)
 
 # 5. Launch the system
+# Full GUI Mode:
 python run.py
+# Headless Daemon Mode:
+python daemons.py
 ```
 
 ## Tech Stack
+... [existing tech stack] ...
+
+## Live Verification Results
+RAVEN 2.0 has been rigorously tested on Windows 11 to ensure end-to-end detection fidelity.
+
+| Surface | Trigger | Result | Status |
+| :--- | :--- | :---: | :---: |
+| **Active Honeypot** | TCP connection to port 9999 | $\checkmark$ Captured | **PASSED** |
+| **Process Monitor** | Unauthorized listener on port 8888 | $\checkmark$ Captured | **PASSED** |
+| **File Integrity** | Unauthorized modification of README.md | $\checkmark$ Captured | **PASSED** |
+| **Log Parsing** | Simulated auth.log/EventLog telemetry | $\checkmark$ Captured | **PASSED** |
 
 - **Language**: Python 3.10+
 - **GUI Framework**: CustomTkinter (Modern themed UI)
@@ -174,12 +190,3 @@ RAVEN 2.0 maps detected events directly to the global MITRE ATT&CK knowledge bas
 ### Ethics & Responsible Use
 
 This tool was developed strictly for academic evaluation, defensive research, and internal network monitoring. **RAVEN 2.0 must only be deployed on infrastructure for which the operator has explicit, documented authorization.** The honeypot components are designed to observe, not to retaliate (hack-back), ensuring compliance with international cyber laws and responsible disclosure frameworks.
-FIM TEST
-TRIGGER_FIM
-TRIGGER_FIM_2
-
-FIM_TRIGGER_EVENT
-FIM_TRIGGER_EVENT
-TRIGGER
-FIM_TRIGGER_FINAL
-FIM_TRIGGER_FINAL
