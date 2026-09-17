@@ -118,6 +118,7 @@ def analyze_threat(event_type: str, raw_log: str, source_ip: str) -> dict:
                     "recommendation": str(parsed.get("recommendation", fallback["recommendation"])),
                 }
         except Exception as e:
+            print(f"[DEBUG] OpenRouter Error: {type(e).__name__}: {e}")
             print(f"[Analyzer] OpenRouter failed: {e}. Trying Ollama fallback...")
 
     # 2. Try Ollama

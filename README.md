@@ -174,3 +174,12 @@ RAVEN 2.0 maps detected events directly to the global MITRE ATT&CK knowledge bas
 ### Ethics & Responsible Use
 
 This tool was developed strictly for academic evaluation, defensive research, and internal network monitoring. **RAVEN 2.0 must only be deployed on infrastructure for which the operator has explicit, documented authorization.** The honeypot components are designed to observe, not to retaliate (hack-back), ensuring compliance with international cyber laws and responsible disclosure frameworks.
+FIM TEST
+TRIGGER_FIM
+TRIGGER_FIM_2
+
+FIM_TRIGGER_EVENT
+FIM_TRIGGER_EVENT
+TRIGGER
+FIM_TRIGGER_FINAL
+FIM_TRIGGER_FINAL

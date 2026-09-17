@@ -71,6 +71,14 @@ def init_db():
         );
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS fim_baseline (
+            path TEXT PRIMARY KEY,
+            hash TEXT,
+            last_checked TEXT
+        );
+    """)
+
     conn.commit()
     conn.close()
     print(f"Database ready at {DB_PATH}")

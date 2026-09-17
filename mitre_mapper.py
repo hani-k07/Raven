@@ -89,6 +89,12 @@ MITRE_MAP = {
         "technique_id": "T1190",
         "technique_name": "Exploit Public-Facing Application",
     },
+    "Failed Logon": {
+        "tactic_id": "TA0006",
+        "tactic_name": "Credential Access",
+        "technique_id": "T1110",
+        "technique_name": "Brute Force",
+    },
 }
 
 def get_mitre(event_type: str) -> dict:
